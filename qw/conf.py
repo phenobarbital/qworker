@@ -15,6 +15,13 @@ WORKER_DEFAULT_QTY = config.get('WORKER_DEFAULT_QTY', fallback=4)
 WORKER_QUEUE_SIZE = config.get('WORKER_QUEUE_SIZE', fallback=4)
 
 
+## Network Discovery:
+WORKER_DISCOVERY_HOST = config.get('WORKER_DISCOVERY_HOST')
+WORKER_DISCOVERY_PORT = config.get('WORKER_DISCOVERY_PORT', fallback=8434)
+WORKER_DISCOVERY_BROADCAST = config.get('WORKER_DISCOVERY_BROADCAST', '255.255.255.255')
+expected_message = 'qw_discovery_broadcast'
+
+
 REDIS_HOST = config.get('REDIS_HOST', fallback='localhost')
 REDIS_PORT = config.get('REDIS_PORT', fallback=6379)
 REDIS_WORKER_DB = config.get('REDIS_WORKER_DB', fallback=2)
@@ -29,6 +36,8 @@ HIGH_LIST = [e.strip() for e in list(config.get(
     'WORKER_HIGH_LIST', fallback='127.0.0.1:8899').split(","))]
 WORKER_HIGH_LIST = get_worker_list(HIGH_LIST)
 
+# upgrade no-files
+NOFILES = config.get('ULIMIT_NOFILES', fallback=16384)
 
 try:
     from settings.settings import WORKER_LIST, WORKER_HIGH_LIST, WORKER_REDIS, WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT # pylint: disable=W0611

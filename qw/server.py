@@ -1,7 +1,6 @@
 """QueueWorker Server Implementation"""
 import asyncio
 import inspect
-import logging
 import multiprocessing as mp
 import os
 import queue
@@ -9,12 +8,13 @@ import socket
 import uuid
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
-from typing import Callable
+from collections.abc import Callable
 
 import cloudpickle
 import jsonpickle
 import uvloop
-from qw.exceptions import *
+from navconfig.logging import logging
+from qw.exceptions import QWException, ConfigError
 
 from .conf import (
     WORKER_DEFAULT_HOST,
@@ -24,7 +24,7 @@ from .conf import (
 )
 from .utils.json import json_encoder
 from .utils import cPrint
-from .wrappers import FuncWrapper, QueueWrapper, TaskWrapper
+from .wrappers import QueueWrapper # FuncWrapper, TaskWrapper
 
 asyncio.set_event_loop_policy(
     uvloop.EventLoopPolicy()
@@ -52,7 +52,7 @@ def start_server(num_worker, host, port, debug: bool):
         loop.run_until_complete(
             worker.start()
         )
-    except (KeyboardInterrupt, Exception):
+    except KeyboardInterrupt:
         print(f'Shutdown Worker {worker.name}')
         loop.run_until_complete(
             worker.shutdown()
@@ -184,27 +184,27 @@ class QWorker:
         if self.debug is True:
             cPrint('::: QueueWorker Server Closed ::: ', level='INFO')
 
-    @classmethod
-    def create_server(cls, num_worker, host, port, debug: bool = False):
-        """Factory method that creates an instance of the Worker Server.
+    # @classmethod
+    # def create_server(cls, num_worker, host, port, debug: bool = False):
+    #     """Factory method that creates an instance of the Worker Server.
 
-        Args:
-            host: Hostname of the server.
-            port: Port number of the server.
-            num_worker: Number of this worker.
-            debug: optional boolean for enabling debug
-        Returns:
-            An instance of the server.
-        """
-        event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(event_loop)
-        return cls(
-            host=host,
-            port=port,
-            event_loop=event_loop,
-            debug=debug,
-            worker_id=num_worker
-        )
+    #     Args:
+    #         host: Hostname of the server.
+    #         port: Port number of the server.
+    #         num_worker: Number of this worker.
+    #         debug: optional boolean for enabling debug
+    #     Returns:
+    #         An instance of the server.
+    #     """
+    #     event_loop = asyncio.new_event_loop()
+    #     asyncio.set_event_loop(event_loop)
+    #     return cls(
+    #         host=host,
+    #         port=port,
+    #         event_loop=event_loop,
+    #         debug=debug,
+    #         worker_id=num_worker
+    #     )
 
     def run_process(self, fn):
         """Unpickles task, runs it and pickles result."""
@@ -238,20 +238,20 @@ class QWorker:
             result = err
         return result
 
-    async def run_task(self, task: TaskWrapper):
-        result = None
-        try:
-            await task.create()
-            result = await task.run()
-        except Exception as err:
-            result = err
-        finally:
-            try:
-                await task.close()
-            except Exception:
-                pass
-        print(f'RUN TASK {task!s} RESULT> ', result)
-        return result
+    # async def run_task(self, task: TaskWrapper):
+    #     result = None
+    #     try:
+    #         await task.create()
+    #         result = await task.run()
+    #     except Exception as err:
+    #         result = err
+    #     finally:
+    #         try:
+    #             await task.close()
+    #         except Exception:
+    #             pass
+    #     print(f'RUN TASK {task!s} RESULT> ', result)
+    #     return result
 
     def run_queued_task(self, task):
         """Run a DI-task in a isolated process pool."""
@@ -281,20 +281,20 @@ class QWorker:
             if self.debug:
                 cPrint(f'Running Queued Task {task!s}', level='DEBUG')
             # processing the task received
-            if isinstance(task, TaskWrapper):
-                # Running a DataIntegrator Task
-                task.set_loop(self._loop)
-                task.debug = self.debug
-                result = await self.run_task(task)
-                logging.debug(f'{task!s} Result: {result!r}')
-            elif isinstance(task, FuncWrapper):
-                # running a FuncWrapper
-                result = None
-                try:
-                    result = await self.run_task(task)
-                except Exception as err:
-                    result = err
-                logging.debug(f'{task!s} Result: {result!r}')
+            # if isinstance(task, TaskWrapper):
+            #     # Running a DataIntegrator Task
+            #     task.set_loop(self._loop)
+            #     task.debug = self.debug
+            #     result = await self.run_task(task)
+            #     logging.debug(f'{task!s} Result: {result!r}')
+            # elif isinstance(task, FuncWrapper):
+            #     # running a FuncWrapper
+            #     result = None
+            #     try:
+            #         result = await self.run_task(task)
+            #     except Exception as err:
+            #         result = err
+            #     logging.debug(f'{task!s} Result: {result!r}')
             else:
                 # TODO: try to Execute the object deserialized
                 pass

@@ -1,18 +1,20 @@
 """Queue Worker server entry point."""
 import asyncio
-import uvloop
 import argparse
-from settings.settings import (
+import uvloop
+from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
     WORKER_DEFAULT_QTY,
     WORKER_QUEUE_SIZE,
+    WORKER_DISCOVERY_PORT
 
 )
 from .process import spawn_process
 from .utils import cPrint
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+uvloop.install()
 
 def main():
     """Main Worker Function."""
@@ -37,6 +39,9 @@ def main():
     )
     parser.add_argument('--wkname', dest='wkname', type=str, default='Worker',
                         help='Worker Name'
+    )
+    parser.add_argument('--discovery', dest='discovery', type=str, default=WORKER_DISCOVERY_PORT,
+                        help='UDP Port for Service discovery'
     )
     parser.add_argument('--debug', action="store_true", default=False,
                         help="Start workers in Debug Mode"

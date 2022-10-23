@@ -4,10 +4,8 @@ Abstract Wrapper Base.
 Any other wrapper extends this.
 """
 import uuid
-from abc import (
-    ABC,
-    abstractmethod,
-)
+from abc import ABC
+
 
 class QueueWrapper(ABC):
     _queued: bool = True

@@ -1,21 +1,20 @@
 import asyncio
-import logging
 import multiprocessing as mp
 import resource as res
 import subprocess
-from typing import Callable, Tuple
-
+from collections.abc import Callable
 import aioredis
-
-from dataintegration.utils.json import json_encoder
-from settings.settings import NOFILES, WORKER_REDIS
+from navconfig.logging import logging
+from qw.discovery import get_server_discovery
+from .utils.json import json_encoder
+from .conf import NOFILES, WORKER_REDIS
 
 from .server import start_server
 
 QW_WORKER_LIST = 'QW_WORKER_LIST'
 JOB_LIST = []
 
-def raise_nofile(value: int = 4096) -> Tuple[str, int]:
+def raise_nofile(value: int = 4096) -> tuple[str, int]:
     """raise_nofile.
 
     sets nofile soft limit to at least 4096.
@@ -30,14 +29,14 @@ def raise_nofile(value: int = 4096) -> Tuple[str, int]:
     try:
         print(f'setting soft & hard ulimit -n {soft} {hard}')
         res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
-    except (ValueError, Exception) as err:
+    except (ValueError, AttributeError) as err:
         logging.exception(err)
         try:
             ulimit = 'ulimit -{type} {value};'
             subprocess.Popen(ulimit.format(type='n', value=hard), shell=True)
         except Exception as e:
             print('failed to set ulimit, giving up')
-            logging.exception(e, stack_info=True)
+            logging.exception(e, stack_info=False)
     return 'nofile', (soft, hard)
 
 
@@ -108,6 +107,9 @@ class spawn_process(object):
             # register worker in the worker list
             self.loop.run_until_complete(
                 self.register_worker()
+            )
+            self.loop.run_until_complete(
+                get_server_discovery(event_loop=self.loop)
             )
         except Exception as err:
             logging.error(err)

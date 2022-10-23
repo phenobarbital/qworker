@@ -1,7 +1,6 @@
 """QueueWorker Client."""
 import asyncio
 import itertools
-import logging
 import random
 import warnings
 from collections import defaultdict
@@ -12,7 +11,7 @@ import jsonpickle
 import orjson
 import uvloop
 # from dataintegration.utils.parserqs import is_parseable
-
+from navconfig.logging import logging
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -20,9 +19,10 @@ from .conf import (
 )
 
 from .process import QW_WORKER_LIST
-from .wrappers import FuncWrapper, TaskWrapper
+from .wrappers import FuncWrapper #, TaskWrapper
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+uvloop.install()
 
 MAX_RETRY_COUNT = 5
 WAIT_TIME = 0.1  # seconds
@@ -43,10 +43,10 @@ def round_robin_worker(workers):
     while True:
         try:
             return next(workers)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as ex:
             raise Exception(
                 "Cannot launch Work on Empty Worker List"
-            )
+            ) from ex
 
 class QClient:
     """
@@ -121,13 +121,13 @@ class QClient:
                     #     self._workers.remove(worker)
                 warnings.warn(f"Timeout, skipping {worker!r}")
                 await asyncio.sleep(WAIT_TIME)
-            except ConnectionRefusedError:
+            except ConnectionRefusedError as ex:
                 # connection returns timeout, retry with another worker
                 self._num_retries[worker] += 1
                 if self._num_retries[worker] > MAX_RETRY_COUNT:
                     raise RuntimeError(
-                        f'Max number of retries reached for Worker: {worker!r}'
-                    )
+                        f'Max number of retries reached: {worker!r}: {ex}'
+                    ) from ex
                 warnings.warn(
                     f"Can't connect to {worker!r}. Retrying..."
                 )
@@ -138,7 +138,7 @@ class QClient:
                 if self._num_retries[worker] > MAX_RETRY_COUNT:
                     raise RuntimeError(
                         f'Max number of retries is reached for {worker!r}, error: {err!s}'
-                    )
+                    ) from err
                 warnings.warn(
                     f"Can't connect to {worker!r}. Retrying..."
                 )
