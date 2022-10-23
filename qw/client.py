@@ -11,10 +11,13 @@ import cloudpickle
 import jsonpickle
 import orjson
 import uvloop
-from dataintegration.utils.parserqs import is_parseable
+# from dataintegration.utils.parserqs import is_parseable
 
-from settings.settings import (WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT,
-                               WORKER_REDIS)
+from .conf import (
+    WORKER_DEFAULT_HOST,
+    WORKER_DEFAULT_PORT,
+    WORKER_REDIS
+)
 
 from .process import QW_WORKER_LIST
 from .wrappers import FuncWrapper, TaskWrapper
@@ -30,10 +33,10 @@ def random_worker(workers):
     while True:
         try:
             yield random.choice(workers)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as ex:
             raise Exception(
                 "Cannot launch Work on Empty Worker List"
-            )
+            ) from ex
 
 def round_robin_worker(workers):
     """Pick next worker based on Round Robin."""
@@ -240,24 +243,24 @@ class QClient:
                 except Exception as err:
                     res.append(el)
             return res
-        elif isinstance(task_result, str):
-            if newval:=is_parseable(task_result):
-                val = newval(task_result)
-                if isinstance(val, list):
-                    new_val = []
-                    for el in val:
-                        if nval:=is_parseable(el):
-                            new_val.append(nval(el))
-                        else:
-                            new_val.append(el)
-                    val = new_val
-                return val
-            # try to de-serialize the result:
-            try:
-                return rapidjson.loads(task_result)
-            except Exception as err:
-                logging.error(err)
-                return task_result
+        # elif isinstance(task_result, str):
+        #     if newval:=is_parseable(task_result):
+        #         val = newval(task_result)
+        #         if isinstance(val, list):
+        #             new_val = []
+        #             for el in val:
+        #                 if nval:=is_parseable(el):
+        #                     new_val.append(nval(el))
+        #                 else:
+        #                     new_val.append(el)
+        #             val = new_val
+        #         return val
+        #     # try to de-serialize the result:
+        #     try:
+        #         return orjson.loads(task_result)
+        #     except Exception as err:
+        #         logging.error(err)
+        #         return task_result
         else:
             return task_result
 

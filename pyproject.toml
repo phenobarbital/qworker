@@ -14,7 +14,7 @@ author = "Jesus Lara Gimenez"
 author-email = "jesuslarag@gmail.com"
 home-page = "https://github.com/phenobarbital/qworker"
 license = "MIT"
-keywords=["asyncio", "workers", "queue workers", "asyncio server", "distributed worker", "distributed-systems"]
+keywords = "distributed objects, workers, asyncio, task queue, RPC, remote method call"
 classifiers=[
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
@@ -34,7 +34,6 @@ classifiers=[
 ]
 description-file = "README.md"
 requires-python = ">=3.8.5"
-readme = "README.md"
 
 [tool.pytest.ini_options]
 addopts = [

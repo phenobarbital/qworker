@@ -14,13 +14,15 @@ from typing import Callable
 import cloudpickle
 import jsonpickle
 import uvloop
-from asyncdb.exceptions import default_exception_handler
-from dataintegration.exceptions import *
-from dataintegration.utils.json import json_encoder
+from qw.exceptions import *
 
-from settings.settings import (WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT,
-                               WORKER_DEFAULT_QTY, WORKER_QUEUE_SIZE)
-
+from .conf import (
+    WORKER_DEFAULT_HOST,
+    WORKER_DEFAULT_PORT,
+    WORKER_DEFAULT_QTY,
+    WORKER_QUEUE_SIZE
+)
+from .utils.json import json_encoder
 from .utils import cPrint
 from .wrappers import FuncWrapper, QueueWrapper, TaskWrapper
 
@@ -46,7 +48,6 @@ def start_server(num_worker, host, port, debug: bool):
         debug=debug,
         worker_id=num_worker
     )
-    loop.set_exception_handler(default_exception_handler)
     try:
         loop.run_until_complete(
             worker.start()

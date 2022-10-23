@@ -57,6 +57,12 @@ extensions = [
         extra_compile_args=COMPILE_ARGS,
         language="c"
     ),
+    Extension(
+        name='qw.utils.json',
+        sources=['qw/utils/json.pyx'],
+        extra_compile_args=COMPILE_ARGS,
+        language="c++"
+    ),
 ]
 
 setup(
@@ -67,7 +73,7 @@ setup(
     description=__description__,
     long_description=readme(),
     long_description_content_type='text/markdown',
-    keywords = ["distributed objects", "workers", "asyncio", "task queue", "RPC", "remote method call"],
+    keywords = "distributed objects, workers, asyncio, task queue, RPC, remote method call",
     license=__license__,
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -97,11 +103,16 @@ setup(
         'asyncio==3.4.3',
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
-        'cloudpickle==2.1.0',
+        'cloudpickle==2.2.0',
+        'jsonpickle==2.2.0',
         'cchardet==2.1.7',
         'cryptography>=3.2',
         'aiofile==3.8.1',
-        'beautifulsoup4'
+        'beautifulsoup4',
+        'aioredis==2.0.1',
+        'async-timeout==4.0.2',
+        'orjson==3.8.0',
+        'navconfig>=1.0.0'
     ],
     ext_modules=cythonize(extensions),
     tests_require=[

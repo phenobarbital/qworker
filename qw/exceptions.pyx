@@ -22,7 +22,12 @@ cdef class QWException(Exception):
         return self.message
 
 #### Exceptions:
-cdef class ConfigError(AuthException):
+cdef class ConfigError(QWException):
 
     def __init__(self, str message = None):
-        super().__init__(message or f"Auth Configuration Error.", status=500)
+        super().__init__(message or f"QW Configuration Error.", status=500)
+
+cdef class ParserError(QWException):
+
+    def __init__(self, str message = None):
+        super().__init__(message or f"JSON Parser Error", status=410)

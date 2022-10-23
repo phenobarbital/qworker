@@ -7,5 +7,8 @@ cdef class QWException(Exception):
     pass
 
 #### Exceptions:
-cdef class ConfigError(AuthException):
+cdef class ConfigError(QWException):
+    pass
+
+cdef class ParserError(QWException):
     pass
