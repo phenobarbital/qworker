@@ -1,0 +1,48 @@
+[build-system]
+requires = [
+    'setuptools>=47',
+    'cython==0.29.32',
+    'wheel==0.37.1',
+    'flit'
+]
+
+build-backend = "setuptools.build_meta"
+
+[tool.flit.metadata]
+module = "qw"
+author = "Jesus Lara Gimenez"
+author-email = "jesuslarag@gmail.com"
+home-page = "https://github.com/phenobarbital/qworker"
+license = "MIT"
+keywords=["asyncio", "workers", "queue workers", "asyncio server", "distributed worker", "distributed-systems"]
+classifiers=[
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python",
+  "Typing :: Typed",
+  "Environment :: Web Environment",
+  "Framework :: AsyncIO",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Build Tools",
+  "License :: OSI Approved :: MIT License",
+]
+description-file = "README.md"
+requires-python = ">=3.8.5"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+]
+
+filterwarnings = [
+    "error",
+    'ignore:The loop argument is deprecated since Python 3\.8, and scheduled for removal in Python 3\.10:DeprecationWarning:asyncio',
+]

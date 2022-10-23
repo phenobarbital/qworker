@@ -1,0 +1,28 @@
+# cython: language_level=3, embedsignature=True, boundscheck=False, wraparound=True, initializedcheck=False
+# Copyright (C) 2018-present Jesus Lara
+#
+"""QueueWorker Exceptions."""
+cdef class QWException(Exception):
+    """Base class for other exceptions"""
+
+    status: int = 400
+
+    def __init__(self, str message, int status = 400, **kwargs):
+        super().__init__(message)
+        self.stacktrace = None
+        if 'stacktrace' in kwargs:
+            self.stacktrace = kwargs['stacktrace']
+        self.message = message
+        self.status = int(status)
+
+    def __str__(self):
+        return f"{self.message}"
+
+    def get(self):
+        return self.message
+
+#### Exceptions:
+cdef class ConfigError(AuthException):
+
+    def __init__(self, str message = None):
+        super().__init__(message or f"Auth Configuration Error.", status=500)

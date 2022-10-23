@@ -1,0 +1,10 @@
+
+include LICENSE
+include CHANGELOG.md
+include README.md
+include Makefile
+graft qw
+graft docs
+graft tests
+global-exclude *.pyc
+prune docs/_build

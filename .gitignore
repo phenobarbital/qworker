@@ -3,9 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
+# C extensions:
 *.so
 
+# Configuration
+settings/
+etc/
+env/
 # Distribution / packaging
 .Python
 build/
@@ -18,6 +22,8 @@ lib/
 lib64/
 parts/
 sdist/
+dist/
+build/
 var/
 wheels/
 pip-wheel-metadata/
