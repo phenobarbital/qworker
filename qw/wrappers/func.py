@@ -13,4 +13,4 @@ class FuncWrapper(QueueWrapper):
         return self.func(*self.args, **self.kwargs)
 
     def __str__(self):
-        return '<%s> from %s' % (self.func.__name__, self.host)
+        return '<%s> from %s' % (self.func.__name__, self.host) # pylint: disable=C0209

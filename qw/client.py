@@ -12,20 +12,24 @@ import orjson
 import uvloop
 # from dataintegration.utils.parserqs import is_parseable
 from navconfig.logging import logging
+from qw.discovery import get_client_discovery
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
-    WORKER_REDIS
+    WORKER_REDIS,
+    USE_DISCOVERY
 )
-
 from .process import QW_WORKER_LIST
 from .wrappers import FuncWrapper #, TaskWrapper
+
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
 
+
 MAX_RETRY_COUNT = 5
 WAIT_TIME = 0.1  # seconds
+
 
 # TODO: select a non-busy Worker
 def random_worker(workers):
@@ -45,7 +49,7 @@ def round_robin_worker(workers):
             return next(workers)
         except (ValueError, TypeError) as ex:
             raise Exception(
-                "Cannot launch Work on Empty Worker List"
+                f"Bad Worker list: {ex}"
             ) from ex
 
 class QClient:
@@ -62,30 +66,36 @@ class QClient:
     timeout: int = 5
 
     def __init__(self, worker_list: list = None, timeout: int = 5):
-        # starting redis:
-        self.redis = aioredis.ConnectionPool.from_url(
-                WORKER_REDIS,
-                decode_responses=True,
-                encoding='utf-8'
-        )
         self._loop = asyncio.get_event_loop()
-        if not worker_list:
-            # getting the list from redis
-            self._worker_list = self.get_workers()
-            if not self._worker_list:
-                logging.warning(
-                    'EMPTY WORKER LIST: trying to connect to a default Worker'
-                )
-                # try to connect with the default worker
-                self._worker_list = [(WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT)]
-        else:
+        ## check if we use network discovery or redis list:
+        if worker_list:
             self._worker_list = itertools.cycle(worker_list)
+        else:
+            if USE_DISCOVERY is True:
+                # get worker list from discovery:
+                self._worker_list = get_client_discovery()
+            else:
+                # starting redis:
+                self.redis = aioredis.ConnectionPool.from_url(
+                        WORKER_REDIS,
+                        decode_responses=True,
+                        encoding='utf-8'
+                )
+                # getting the list from redis
+                self._worker_list = self.get_workers()
+        if not self._worker_list:
+            logging.warning(
+                'EMPTY WORKER LIST: Trying to connect to a default Worker'
+            )
+            # try to connect with the default worker
+            self._worker_list = [(WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT)]
         self._num_retries = defaultdict(int)
-
-        # self._workers = random_worker(self._worker_list)
         self._workers = round_robin_worker(self._worker_list)
         self.timeout = timeout
 
+    def discover_worker(self):
+        if USE_DISCOVERY is True:
+            self._worker_list = get_client_discovery()
 
     def get_workers(self):
         async def get_workers_list():
@@ -154,7 +164,10 @@ class QClient:
         if writer.can_write_eof():
             writer.write_eof()
         await writer.drain()
-        # await self.redis.disconnect(inuse_connections = True)
+        try:
+            await self.redis.disconnect(inuse_connections = True)
+        except Exception as err:
+            logging.error(err)
         logging.debug('Closing Socket')
         writer.close()
 

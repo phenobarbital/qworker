@@ -4,7 +4,6 @@ import socket
 from .conf import (
     WORKER_DISCOVERY_HOST,
     WORKER_DISCOVERY_PORT,
-    WORKER_DISCOVERY_BROADCAST,
     expected_message
 )
 
@@ -52,13 +51,13 @@ async def get_server_discovery(event_loop: asyncio.AbstractEventLoop) -> Any:
     )
 
 
-def get_client_discovery() -> Any:
+def get_client_discovery() -> list:
     # Create a UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-    sock.settimeout(2)
+    sock.settimeout(3)
     srv_addr = ('', WORKER_DISCOVERY_PORT)
     try:
         detected = []
@@ -73,4 +72,4 @@ def get_client_discovery() -> Any:
                 break
     finally:
         sock.close()
-        return detected # pylint: disable=W0150
+        return iter(detected) # pylint: disable=W0150
