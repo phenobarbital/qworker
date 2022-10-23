@@ -97,7 +97,7 @@ setup(
         'asyncio==3.4.3',
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
-        'cloudpickle==2.1.0',
+        'cloudpickle==2.2.0',
         'cchardet==2.1.7',
         'cryptography>=3.2',
         'aiofile==3.8.1',
