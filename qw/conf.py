@@ -31,6 +31,6 @@ WORKER_HIGH_LIST = get_worker_list(HIGH_LIST)
 
 
 try:
-    from settings import WORKER_LIST, WORKER_HIGH_LIST, WORKER_REDIS, WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT # pylint: disable=W0611
+    from settings.settings import WORKER_LIST, WORKER_HIGH_LIST, WORKER_REDIS, WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT # pylint: disable=W0611
 except ImportError:
     pass
