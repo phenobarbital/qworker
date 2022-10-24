@@ -112,6 +112,8 @@ setup(
         'aioredis==2.0.1',
         'async-timeout==4.0.2',
         'orjson==3.8.0',
+        'msgpack==1.0.4',
+        'serpent==1.41',
         'navconfig>=1.0.0'
     ],
     ext_modules=cythonize(extensions),

@@ -1,16 +1,16 @@
 """Client Example of Queue Worker."""
 import asyncio
-import requests
-from collections import ChainMap
-from collections import Counter
+from collections import ChainMap, Counter
 import time
-from qw.utils import cPrint
+import requests
 from qw.client import QClient
+from qw.utils import cPrint
 
-workers = [("nav-api.dev.local", 8888)]
+# workers = [("nav-api.dev.local", 8888)]
 
 qw = QClient()
 
+print('SERVER : ', qw.get_servers())
 URLS = {
     "http://www.gutenberg.org/cache/epub/996/pg996.txt",
     "http://www.gutenberg.org/files/1342/1342-0.txt",
@@ -25,7 +25,7 @@ URLS = {
 
 def top_words(url, n):
     """Returns top n words from text specified by url."""
-    text = requests.get(url).text.split()
+    text = requests.get(url, timeout=10).text.split()
     return {url: Counter(text).most_common(n)}
 
 async def get_top_words(urls, n):

@@ -6,9 +6,9 @@ import warnings
 import time
 import random
 import cloudpickle
-import logging
+from navconfig.logging import logging
 # from qw.wrappers import FuncWrapper, TaskWrapper
-import rapidjson
+import orjson
 
 WAIT_TIME = 0.1  # seconds
 
@@ -65,7 +65,7 @@ async def test_client():
         task_result = None
     except Exception as err:
         # logging.exception(f'Error receiving data from Worker Server: {err!s}')
-        task_result = rapidjson.loads(task_result)
+        task_result = orjson.loads(task_result)
 
     logging.debug(f'Data Received: {task_result}')
     print('Close the socket')

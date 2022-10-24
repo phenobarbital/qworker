@@ -16,6 +16,8 @@ class QueueWrapper(ABC):
             self._queued = kwargs['queued']
             del kwargs['queued']
         self._id = uuid.uuid4()
+        self.args = args
+        self.kwargs = kwargs
 
     @property
     def queued(self):

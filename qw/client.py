@@ -3,8 +3,10 @@ import asyncio
 import itertools
 import random
 import warnings
+from typing import Any
+from collections.abc import Callable
 from collections import defaultdict
-
+from functools import partial
 import aioredis
 import cloudpickle
 import jsonpickle
@@ -13,6 +15,10 @@ import uvloop
 # from dataintegration.utils.parserqs import is_parseable
 from navconfig.logging import logging
 from qw.discovery import get_client_discovery
+from qw.exceptions import (
+    ParserError,
+    QWException
+)
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -20,7 +26,7 @@ from .conf import (
     USE_DISCOVERY
 )
 from .process import QW_WORKER_LIST
-from .wrappers import FuncWrapper #, TaskWrapper
+from .wrappers import FuncWrapper, TaskWrapper
 
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -51,6 +57,8 @@ def round_robin_worker(workers):
             raise Exception(
                 f"Bad Worker list: {ex}"
             ) from ex
+        except StopIteration:
+            break
 
 class QClient:
     """
@@ -64,6 +72,7 @@ class QClient:
                              each task queue server.
     """
     timeout: int = 5
+    redis: Callable = None
 
     def __init__(self, worker_list: list = None, timeout: int = 5):
         self._loop = asyncio.get_event_loop()
@@ -93,7 +102,7 @@ class QClient:
         self._workers = round_robin_worker(self._worker_list)
         self.timeout = timeout
 
-    def discover_worker(self):
+    def discover_workers(self):
         if USE_DISCOVERY is True:
             self._worker_list = get_client_discovery()
 
@@ -108,14 +117,26 @@ class QClient:
             return itertools.cycle(self._worker_list)
         return self._loop.run_until_complete(get_workers_list())
 
+    def get_servers(self) -> list:
+        return self._worker_list
+
+    def register_pickle_module(self, module: Any):
+        cloudpickle.register_pickle_by_value(module)
 
     async def get_connection(self):
         retries = {}
         reader = None
         writer = None
+        if not self._worker_list:
+            # try discover again a worker list:
+            self.discover_workers()
         while True:
             worker = round_robin_worker(self._worker_list)
-            logging.debug(f':::: WORKER SELECTED: {worker!r}')
+            logging.debug(f':: WORKER SELECTED: {worker!r}')
+            if not worker:
+                raise ConnectionAbortedError(
+                    "Error: There is no workers to work with."
+                )
             try:
                 task = asyncio.open_connection(
                     *worker
@@ -126,16 +147,16 @@ class QClient:
                 retries[worker] = 0
                 return [reader, writer]
             except asyncio.TimeoutError:
-                    # removing this worker from the self workers
-                    # if len(self._workers) > 0:
-                    #     self._workers.remove(worker)
+                # removing this worker from the self workers
+                if len(self._workers) > 0:
+                    self._workers.remove(worker)
                 warnings.warn(f"Timeout, skipping {worker!r}")
                 await asyncio.sleep(WAIT_TIME)
             except ConnectionRefusedError as ex:
                 # connection returns timeout, retry with another worker
                 self._num_retries[worker] += 1
                 if self._num_retries[worker] > MAX_RETRY_COUNT:
-                    raise RuntimeError(
+                    raise ConnectionError(
                         f'Max number of retries reached: {worker!r}: {ex}'
                     ) from ex
                 warnings.warn(
@@ -146,7 +167,7 @@ class QClient:
             except OSError as err:
                 self._num_retries[worker] += 1
                 if self._num_retries[worker] > MAX_RETRY_COUNT:
-                    raise RuntimeError(
+                    raise ConnectionError(
                         f'Max number of retries is reached for {worker!r}, error: {err!s}'
                     ) from err
                 warnings.warn(
@@ -165,38 +186,51 @@ class QClient:
             writer.write_eof()
         await writer.drain()
         try:
-            await self.redis.disconnect(inuse_connections = True)
-        except Exception as err:
+            if self.redis:
+                await self.redis.disconnect(inuse_connections = True)
+        except (AttributeError, ConnectionError) as err:
             logging.error(err)
         logging.debug('Closing Socket')
         writer.close()
 
-    async def run(self, fn, *args, **kwargs):
+    async def run(self, fn: Any, *args, use_wrapper: bool = False, **kwargs):
         """Runs a function in Queue Worker
 
         Run function in the Queue Worker, returns the result or raises exception.
 
         Args:
-            fn: Function to run in Worker.
-            args: non-keyword arguments
+            fn: Any Function, object or callable to be send to Worker.
+            args: any non-keyword arguments
+            use_wrapper: (bool) wraps function into a Function Wrapper.
             kwargs: keyword arguments.
 
         Returns:
             Function Result.
+
+        Raises:
+            ConfigError: bad instructions to Worker Client.
+            ConnectionError: unable to connect to Worker.
+            Exception: Any Unhandled error.
         """
         try:
             reader, writer = await self.get_connection()
+        except ConnectionError as ex:
+            raise ConnectionError(
+                f"Unable to Connect to Queue Worker: {ex}"
+            ) from ex
         except Exception as err:
             logging.error(err)
             raise
 
         host, *_ = writer.get_extra_info('sockname')
         # wrapping the function into Task Wrapper
-        logging.debug(f'Sending function {fn!s} to Worker {host}')
-        if isinstance(fn, TaskWrapper):
+        logging.debug(f'Sending Object {fn!s} to Worker {host}')
+        if isinstance(fn, (TaskWrapper, FuncWrapper)):
+            # already wrapped
             func = fn
             func.queued = False
-        else:
+        elif use_wrapper is True:
+            # wrap function into a Wrapper:
             func = FuncWrapper(
                 host,
                 fn,
@@ -204,8 +238,9 @@ class QClient:
                 **kwargs
             )
             func.queued = False
-        # serializing
-        serialized_result = None
+        else:
+            # sent function *as is*
+            func = partial(fn, *args, **kwargs)
         try:
             serialized_task = cloudpickle.dumps(func)
             writer.write(serialized_task)
@@ -216,44 +251,53 @@ class QClient:
         except Exception as err:
             logging.error(f'Error Serializing Task: {err!s}')
             raise
-        await asyncio.sleep(.1)
-        # try to get result
+        # Then, got the result:
+        serialized_result = None
         try:
             while True:
                 serialized_result = await reader.read(-1)
                 if reader.at_eof():
                     break
-        except Exception as err:
-            raise Exception from err
+        except Exception as ex:
+            raise QWException(
+                f"Error getting results from Worker: {ex}"
+            ) from ex
         finally:
             await self.close(writer)
-
         try:
             task_result = cloudpickle.loads(serialized_result)
             logging.debug(
                 f'Data Received: {task_result!r}'
             )
             try:
-                result = jsonpickle.decode(task_result)
-            except Exception as err:
+                if isinstance(task_result, str):
+                    result = jsonpickle.decode(task_result)
+                else:
+                    result = task_result
+            except (TypeError, ValueError):
                 result = task_result
             task_result = result
+        except (ValueError, TypeError) as ex:
+            raise ParserError(
+                f"Error Parsing serialized results: {ex}"
+            ) from ex
         except EOFError as err:
             logging.exception(f'No data was received from Server: {err!s}')
             task_result = None
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             logging.exception(f'Error receiving data from Worker Server: {err!s}')
             task_result = None
         if isinstance(task_result, BaseException):
             # raise task_result
             return task_result
         elif isinstance(task_result, list):
+            # try to convert into object:
             res = []
             for el in task_result:
                 try:
                     a = orjson.loads(el)
                     res.append(a)
-                except Exception as err:
+                except (TypeError, ValueError) as err:
                     res.append(el)
             return res
         # elif isinstance(task_result, str):
@@ -277,32 +321,35 @@ class QClient:
         else:
             return task_result
 
-    async def queue(self, fn, *args, **kwargs):
+    async def queue(self, fn: Any, *args, **kwargs):
         """Send a function to a Queue Worker and return.
 
         Send & Forget functionality to send a task to Queue Worker.
 
         Args:
-            fn: Function to run in Worker.
-            args: non-keyword arguments
+            fn: Any Function, object or callable to be send to Worker.
+            args: any non-keyword arguments
             kwargs: keyword arguments.
 
         Returns:
             Queue Id
+
+        Raises:
+            ConfigError: bad instructions to Worker Client.
+            ConnectionError: unable to connect to Worker.
+            Exception: Any Unhandled error.
         """
-        # TODO: Using READER to receive ACK of Task enqueued.
+        # TODO: Use Task id to return (later) the result of Task.
         try:
             reader, writer = await self.get_connection()
         except Exception as err:
             logging.error(err)
             raise
-        print(f'Sending function {fn!s} to Worker')
+        logging.debug(f'Sending function {fn!s} to Worker')
         host, *_ = writer.get_extra_info('sockname')
-        # wrapping the function into Task Wrapper
-        # print(host, fn, args, kwargs)
-        if isinstance(fn, TaskWrapper):
+        if isinstance(fn, (FuncWrapper, TaskWrapper)):
+            # Function was wrapped or is already wrapped
             func = fn
-            task_id = fn.id
         else:
             func = FuncWrapper(
                 host,
@@ -310,25 +357,34 @@ class QClient:
                 *args,
                 **kwargs
             )
-            task_id = f"{func!r}"
         # serializing
         try:
             # getting data
             serialized_task = cloudpickle.dumps(func)
             writer.write(serialized_task)
+            # sending data to worker:
             if writer.can_write_eof():
                 writer.write_eof()
             await writer.drain()
-            logging.debug('Closing Socket')
-            writer.close()
+            # asks server if task was queued:
+            try:
+                while True:
+                    serialized_result = await reader.read(-1)
+                    if reader.at_eof():
+                        break
+            except Exception as err:
+                raise Exception from err
+            finally:
+                await self.close(writer)
+            received = cloudpickle.loads(serialized_result)
             # we dont need the result, return true
             serialized_result = {
                 "status": "Queued",
                 "task": f"{func!r}",
-                "task_id": task_id
+                "message": received
             }
             return serialized_result
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             logging.exception(
                 f'Error Serializing Task: {err!s}'
             )

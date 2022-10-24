@@ -2,14 +2,19 @@
 
 Wrapping a DI-task to be executed by Worker.
 """
-import logging
 import multiprocessing as mp
-from dataintegration.task import Task
-from dataintegration.exceptions import (
-    TaskNotFound,
-    TaskError,
-    TaskFailed
-)
+from navconfig.logging import logging
+try:
+    from dataintegration.task import Task
+    from dataintegration.exceptions import (
+        TaskNotFound,
+        TaskError,
+        TaskFailed
+    )
+except ImportError:
+    logging.warning(
+        "Unable to Load DataIntegrator Task Component, we can't send DI Tasks to any Worker."
+    )
 from .base import QueueWrapper
 
 class TaskWrapper(QueueWrapper):
@@ -75,14 +80,14 @@ class TaskWrapper(QueueWrapper):
             result = await self.run()
             try:
                 stats = self._task.stats.stats
-            except Exception:
+            except Exception: # pylint: disable=W0703
                 stats = None
             result = {
                 "result": result,
                 "stats": stats
             }
             return result
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             print(err)
             result = err
             return result
@@ -115,7 +120,7 @@ class TaskWrapper(QueueWrapper):
         try:
             await self._task.close()
             del self._task
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             logging.error(err)
 
     def __str__(self):

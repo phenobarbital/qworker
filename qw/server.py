@@ -14,7 +14,7 @@ import cloudpickle
 import jsonpickle
 import uvloop
 from navconfig.logging import logging
-from qw.exceptions import QWException, ConfigError
+from qw.exceptions import QWException, ParserError
 
 from .conf import (
     WORKER_DEFAULT_HOST,
@@ -24,16 +24,15 @@ from .conf import (
 )
 from .utils.json import json_encoder
 from .utils import cPrint
-from .wrappers import QueueWrapper # FuncWrapper, TaskWrapper
+from .wrappers import QueueWrapper, FuncWrapper, TaskWrapper
 
 asyncio.set_event_loop_policy(
     uvloop.EventLoopPolicy()
 )
 uvloop.install()
 
-try:
-    DEFAULT_HOST = WORKER_DEFAULT_HOST
-except Exception as e:
+DEFAULT_HOST = WORKER_DEFAULT_HOST
+if not DEFAULT_HOST:
     DEFAULT_HOST = socket.gethostbyname(socket.gethostname())
 
 
@@ -108,7 +107,7 @@ class QWorker:
         return self._name
 
     async def start(self):
-        """Starts Queue server."""
+        """Starts Queue Manager."""
         self.queue = asyncio.Queue(maxsize=WORKER_QUEUE_SIZE)
         self.executor = ProcessPoolExecutor(
             max_workers=WORKER_DEFAULT_QTY
@@ -132,6 +131,7 @@ class QWorker:
             )
         # server
         self._server = await coro
+        self.server_address = (socket.gethostbyname(socket.gethostname()), self.port)
         try:
             await self.fire_consumers()
             sock = self._server.sockets[0].getsockname()
@@ -140,16 +140,18 @@ class QWorker:
             )
         except Exception as err:
             logging.error(err)
-            raise Exception(f"Error: {err}") from err
+            raise QWException(
+                f"Error: {err}"
+            ) from err
         # Serve requests until Ctrl+C is pressed
         try:
             async with self._server:
                 await self._server.serve_forever()
-        except Exception as err:
+        except RuntimeError as err:
             logging.exception(err, stack_info=True)
 
     async def fire_consumers(self):
-        """Fire up the consumers."""
+        """Fire up the Task consumers."""
         self.consumers = [
             asyncio.create_task(
                 self.task_handler(self.queue)) for _ in range(WORKER_QUEUE_SIZE)
@@ -179,62 +181,40 @@ class QWorker:
         try:
             self._server.close()
             await self._server.wait_closed()
-        except Exception as err:
+        except RuntimeError as err:
             logging.exception(err, stack_info=True)
         if self.debug is True:
             cPrint('::: QueueWorker Server Closed ::: ', level='INFO')
-
-    # @classmethod
-    # def create_server(cls, num_worker, host, port, debug: bool = False):
-    #     """Factory method that creates an instance of the Worker Server.
-
-    #     Args:
-    #         host: Hostname of the server.
-    #         port: Port number of the server.
-    #         num_worker: Number of this worker.
-    #         debug: optional boolean for enabling debug
-    #     Returns:
-    #         An instance of the server.
-    #     """
-    #     event_loop = asyncio.new_event_loop()
-    #     asyncio.set_event_loop(event_loop)
-    #     return cls(
-    #         host=host,
-    #         port=port,
-    #         event_loop=event_loop,
-    #         debug=debug,
-    #         worker_id=num_worker
-    #     )
 
     def run_process(self, fn):
         """Unpickles task, runs it and pickles result."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         fn.set_loop(loop)
-        # task = loop.create_task(self.run_function(fn, loop))
-        # group = asyncio.gather(
-        #     *[task], return_exceptions=True
-        # )
         try:
             result = loop.run_until_complete(
                 self.run_function(fn, loop)
             )
             return result
-        except (RuntimeError, Exception) as err:
-            raise Exception(f"Error: {err}") from err
+        except Exception as err:
+            raise QWException(
+                f"Error: {err}"
+            ) from err
         finally:
             loop.close()
 
     async def run_function(self, fn, event_loop: asyncio.AbstractEventLoop):
         result = None
-        print(f'Running Task {fn!s} with id {fn.id} in worker {self.name!s}')
+        print(f'Running Task {fn!s} in worker {self.name!s}')
         try:
             asyncio.set_event_loop(event_loop)
-            if inspect.isawaitable(fn):
+            if isinstance(fn, FuncWrapper):
+                result = await fn()
+            elif inspect.isawaitable(fn) or asyncio.iscoroutinefunction(fn):
                 result = await fn()
             else:
                 result = fn()
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             result = err
         return result
 
@@ -269,7 +249,7 @@ class QWorker:
                 return result
             print(f'QUEUED TASK {task!s} RESULT> ', result)
             return result
-        except (RuntimeError, Exception) as err:
+        except (RuntimeError) as err:
             raise Exception(f"Error: {err}") from err
         finally:
             loop.close()
@@ -281,20 +261,20 @@ class QWorker:
             if self.debug:
                 cPrint(f'Running Queued Task {task!s}', level='DEBUG')
             # processing the task received
-            # if isinstance(task, TaskWrapper):
-            #     # Running a DataIntegrator Task
-            #     task.set_loop(self._loop)
-            #     task.debug = self.debug
-            #     result = await self.run_task(task)
-            #     logging.debug(f'{task!s} Result: {result!r}')
-            # elif isinstance(task, FuncWrapper):
-            #     # running a FuncWrapper
-            #     result = None
-            #     try:
-            #         result = await self.run_task(task)
-            #     except Exception as err:
-            #         result = err
-            #     logging.debug(f'{task!s} Result: {result!r}')
+            if isinstance(task, TaskWrapper):
+                # Running a DataIntegrator Task
+                task.set_loop(self._loop)
+                task.debug = self.debug
+                result = await self.run_task(task)
+                logging.debug(f'{task!s} Result: {result!r}')
+            elif isinstance(task, FuncWrapper):
+                # running a FuncWrapper
+                result = None
+                try:
+                    result = await self.run_task(task)
+                except Exception as err: # pylint: disable=W0703
+                    result = err
+                logging.debug(f'{task!s} Result: {result!r}')
             else:
                 # TODO: try to Execute the object deserialized
                 pass
@@ -303,9 +283,9 @@ class QWorker:
             logging.debug(f'QUEUE Size after Work: {self.queue.qsize()}')
 
     async def connection_handler(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """ Handler for Task Execution.
+        """ Handler for Function/Task Execution.
 
-        receives the client request and launch the task.
+        receives the client request and run/queue the function..
 
         Args:
             reader: asyncio StreamReader, client information
@@ -323,21 +303,28 @@ class QWorker:
         result = None
         task_uuid = uuid.uuid4()
         addr = writer.get_extra_info("peername")
-        logging.debug(f"Received Task from {addr!r} into worker {self.name!s} pid: {self._pid}")
+        logging.debug(
+            f"Received Data from {addr!r} into worker {self.name!s} pid: {self._pid}"
+        )
         try:
             task = cloudpickle.loads(serialized_task)
             logging.debug(f'TASK RECEIVED: {task}')
+        except RuntimeError as ex:
+            ex = ParserError(f"Error decoding serialized task: {ex}")
+            result = cloudpickle.dumps(ex)
+            await self.closing_writer(writer, result)
+            return False
         except EOFError:
             # send a pong
             result = "Pong: Empty Data"
             await self.closing_writer(writer, result.encode('utf-8'))
             return True
-        except Exception as err:
-            e = Exception(f'No Valid Function was sent to Worker: {err}')
-            result = cloudpickle.dumps(e)
+        except Exception as err: # pylint: disable=W0703
+            exc = Exception(f'No Valid Function was sent to Worker: {err}')
+            result = cloudpickle.dumps(exc)
             await self.closing_writer(writer, result)
             return False
-        # evaluate different tasks
+        # TODO: evaluate different kind of tasks
         if not task or isinstance(task, str):
             addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
             if task == 'health':
@@ -351,6 +338,7 @@ class QWorker:
                     },
                     "worker": {
                         "name": self.name,
+                        "address": self.server_address,
                         "serving": addrs
                     }
                 }
@@ -382,6 +370,7 @@ class QWorker:
                     result = {
                         "error": f"Worker {self.name!s} Queue is Full, discarding Task {task!r}"
                     }
+                    # result = cloudpickle.dumps(result)
                     await self.closing_writer(writer, result)
                     return False
             else:
@@ -390,15 +379,17 @@ class QWorker:
                     task.id = task_uuid
                     fn = partial(self.run_process, task)
                     result = await self._loop.run_in_executor(self._executor, fn)
-                except Exception as err:
+                except Exception as err: # pylint: disable=W0703
                     try:
                         result = cloudpickle.dumps(err)
-                    except Exception as e:
+                    except Exception as ex: # pylint: disable=W0703
                         result = cloudpickle.dumps(
-                            Exception(f'Error on Worker: {str(e)}')
+                            Exception(f'Error on Worker: {ex!s}')
                         )
                     await self.closing_writer(writer, result)
                     return False
+        elif callable(task):
+            result = await self.run_function(task, self._loop)
         else:
             # put work in Queue:
             try:
@@ -411,8 +402,9 @@ class QWorker:
                     f"Worker Queue is Full, discarding Task {task!r}"
                 )
         if result is None:
+            # Not always a Task returns Value, sometimes returns None.
             result = [
-                {"Error": True, "Task": task, "uuid": task_uuid, "worker": self.name}
+                {"uuid": task_uuid, "worker": self.name}
             ]
         try:
             if isinstance(result, BaseException):
@@ -421,10 +413,10 @@ class QWorker:
             elif inspect.isgeneratorfunction(result) or isinstance(result, list):
                 try:
                     result = json_encoder(list(result))
-                except TypeError:
+                except (ValueError, TypeError):
                     result = f"{result!r}" # cannot pickle a generator object
             result = cloudpickle.dumps(result)
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             result = cloudpickle.dumps(err)
             logging.error(f'Error dumping result: {err!s}')
         await self.closing_writer(writer, result)

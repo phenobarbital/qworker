@@ -34,7 +34,7 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
         try:
             ulimit = 'ulimit -{type} {value};'
             subprocess.Popen(ulimit.format(type='n', value=hard), shell=True)
-        except Exception as e:
+        except Exception as e: # pylint: disable=W0703
             print('failed to set ulimit, giving up')
             logging.exception(e, stack_info=False)
     return 'nofile', (soft, hard)
@@ -74,7 +74,7 @@ class spawn_process(object):
     async def stop_redis(self):
         try:
             await self.redis.disconnect(inuse_connections = True)
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             logging.exception(err)
 
     async def register_worker(self):
@@ -111,7 +111,7 @@ class spawn_process(object):
             self.loop.run_until_complete(
                 get_server_discovery(event_loop=self.loop)
             )
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             logging.error(err)
 
     def terminate(self):
@@ -122,7 +122,7 @@ class spawn_process(object):
             self.loop.run_until_complete(
                 self.stop_redis()
             )
-        except Exception as err:
+        except Exception as err: # pylint: disable=W0703
             logging.exception(err)
         for j in JOB_LIST:
             j.terminate()
