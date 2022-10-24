@@ -15,6 +15,7 @@ import uvloop
 # from dataintegration.utils.parserqs import is_parseable
 from navconfig.logging import logging
 from qw.discovery import get_client_discovery
+from qw.utils import make_signature
 from qw.exceptions import (
     ParserError,
     QWException
@@ -23,7 +24,9 @@ from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
     WORKER_REDIS,
-    USE_DISCOVERY
+    USE_DISCOVERY,
+    WORKER_SECRET_KEY,
+    expected_message
 )
 from .process import QW_WORKER_LIST
 from .wrappers import FuncWrapper, TaskWrapper
@@ -123,6 +126,22 @@ class QClient:
     def register_pickle_module(self, module: Any):
         cloudpickle.register_pickle_by_value(module)
 
+    async def validate_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> tuple:
+        signature = make_signature(expected_message, WORKER_SECRET_KEY)
+        writer.write(b'%d\n' % len(signature))
+        writer.write(signature)
+        # sending data to worker:
+        await writer.drain()
+        response = None
+        response = await reader.readexactly(8)
+        if response == b'CONTINUE':
+            return [reader, writer]
+        else:
+            response = cloudpickle.loads(response)
+            if isinstance(response, BaseException):
+                raise response
+
+
     async def get_connection(self):
         retries = {}
         reader = None
@@ -145,7 +164,10 @@ class QClient:
                     task, timeout=self.timeout
                 )
                 retries[worker] = 0
-                return [reader, writer]
+                # check the signature between server and client:
+                return await self.validate_connection(
+                    reader, writer
+                )
             except asyncio.TimeoutError:
                 # removing this worker from the self workers
                 if len(self._workers) > 0:

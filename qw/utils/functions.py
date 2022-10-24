@@ -1,6 +1,13 @@
-""" asyncDB utils.
-Various functions for asyncdb
-"""
+import hashlib
+import hmac
+import base64
+
+
+def make_signature(message: str, key: str) -> str:
+    skey = key.encode('utf-8')
+    msg = message.encode('utf-8')
+    digest = hmac.new(skey, msg, digestmod=hashlib.sha512).digest()
+    return base64.b64encode(digest)
 
 class colors:
     """

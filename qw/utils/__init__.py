@@ -1,1 +1,1 @@
-from .functions import cPrint
+from .functions import cPrint, make_signature

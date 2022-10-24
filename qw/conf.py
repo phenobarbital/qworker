@@ -12,7 +12,7 @@ def get_worker_list(workers: list):
 WORKER_DEFAULT_HOST = config.get('WORKER_DEFAULT_HOST', fallback='0.0.0.0')
 WORKER_DEFAULT_PORT = config.get('WORKER_DEFAULT_PORT', fallback=8888)
 WORKER_DEFAULT_QTY = config.get('WORKER_DEFAULT_QTY', fallback=4)
-WORKER_QUEUE_SIZE = config.get('WORKER_QUEUE_SIZE', fallback=4)
+WORKER_QUEUE_SIZE = config.get('WORKER_QUEUE_SIZE', fallback=8)
 
 
 ## Network Discovery:
@@ -20,8 +20,9 @@ USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=True)
 WORKER_DISCOVERY_HOST = config.get('WORKER_DISCOVERY_HOST')
 WORKER_DISCOVERY_PORT = config.get('WORKER_DISCOVERY_PORT', fallback=8434)
 WORKER_DISCOVERY_BROADCAST = config.get('WORKER_DISCOVERY_BROADCAST', '255.255.255.255')
-expected_message = 'qw_discovery_broadcast'
-
+## Word used by Discovery
+expected_message = config.get('WORKER_DISCOVERY_MESSAGE')
+WORKER_SECRET_KEY = config.get('WORKER_SECRET_KEY')
 
 REDIS_HOST = config.get('REDIS_HOST', fallback='localhost')
 REDIS_PORT = config.get('REDIS_PORT', fallback=6379)

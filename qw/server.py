@@ -15,12 +15,14 @@ import jsonpickle
 import uvloop
 from navconfig.logging import logging
 from qw.exceptions import QWException, ParserError
-
+from qw.utils import make_signature
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
     WORKER_DEFAULT_QTY,
-    WORKER_QUEUE_SIZE
+    WORKER_QUEUE_SIZE,
+    expected_message,
+    WORKER_SECRET_KEY
 )
 from .utils.json import json_encoder
 from .utils import cPrint
@@ -218,41 +220,20 @@ class QWorker:
             result = err
         return result
 
-    # async def run_task(self, task: TaskWrapper):
-    #     result = None
-    #     try:
-    #         await task.create()
-    #         result = await task.run()
-    #     except Exception as err:
-    #         result = err
-    #     finally:
-    #         try:
-    #             await task.close()
-    #         except Exception:
-    #             pass
-    #     print(f'RUN TASK {task!s} RESULT> ', result)
-    #     return result
-
-    def run_queued_task(self, task):
-        """Run a DI-task in a isolated process pool."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        task.set_loop(loop)
-        task = loop.create_task(self.run_task(task))
-        # group = asyncio.gather(
-        #     *[task], return_exceptions=True
-        # )
+    async def run_task(self, task: TaskWrapper):
         result = None
         try:
-            result = loop.run_until_complete(task)
-            if isinstance(result, Exception):
-                return result
-            print(f'QUEUED TASK {task!s} RESULT> ', result)
-            return result
-        except (RuntimeError) as err:
-            raise Exception(f"Error: {err}") from err
+            await task.create()
+            result = await task.run()
+        except Exception as err: # pylint: disable=W0703
+            result = err
         finally:
-            loop.close()
+            try:
+                await task.close()
+            except Exception: # pylint: disable=W0703
+                pass
+        print(f'RUN TASK {task!s} RESULT> ', result)
+        return result
 
     async def task_handler(self, q: asyncio.Queue):
         """Method for handling the tasks received by the connection handler."""
@@ -271,7 +252,7 @@ class QWorker:
                 # running a FuncWrapper
                 result = None
                 try:
-                    result = await self.run_task(task)
+                    result = await self.run_function(task, self._loop)
                 except Exception as err: # pylint: disable=W0703
                     result = err
                 logging.debug(f'{task!s} Result: {result!r}')
@@ -281,6 +262,14 @@ class QWorker:
             q.task_done()
             logging.debug(f'consumed: {task}')
             logging.debug(f'QUEUE Size after Work: {self.queue.qsize()}')
+
+
+    def check_signature(self, payload: bytes) -> bool:
+        signature = make_signature(expected_message, WORKER_SECRET_KEY)
+        if signature == payload:
+            return True
+        else:
+            return False
 
     async def connection_handler(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """ Handler for Function/Task Execution.
@@ -295,6 +284,31 @@ class QWorker:
         """
         # # TODO: task can select which executor to use, else use default:
         print(f':: Starting Handler on worker {self.name!s} ::')
+        addr = writer.get_extra_info("peername")
+        # first time: check signature:
+        try:
+            prefix = await reader.readline()
+            msglen = int(prefix)
+            payload = await reader.readexactly(msglen)
+            if self.check_signature(payload) is False:
+                ### close transport inmediately:
+                exc = ConnectionRefusedError(
+                    'Connection unsecured, Closing now.'
+                )
+                logging.error(f'Closing unsecured connection from {addr}')
+                result = cloudpickle.dumps(exc)
+                await self.closing_writer(
+                    writer,
+                    result
+                )
+                return False
+            else:
+                # passing a "continue" signal:
+                writer.write('CONTINUE'.encode('utf-8'))
+                await writer.drain()
+        except Exception as err: # pylint: disable=W0703
+            logging.exception(f'Error Decoding Signature: {err}', stack_info=True)
+        ## after: deserialize Task:
         serialized_task = b''
         while True:
             serialized_task = await reader.read(-1)
@@ -302,7 +316,6 @@ class QWorker:
                 break
         result = None
         task_uuid = uuid.uuid4()
-        addr = writer.get_extra_info("peername")
         logging.debug(
             f"Received Data from {addr!r} into worker {self.name!s} pid: {self._pid}"
         )
