@@ -27,20 +27,24 @@ async def send_email(sender):
     )
     await email.close()
 
-
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    asyncio.set_event_loop(loop)
+async def create_user():
     user = {
     "name": "Jesus Lara",
         "account": {
             "address": "jesuslarag@gmail.com",
         }
     }
-    jesus = Actor(**user)
+    print(f'CREATING a NEW USER {user}')
+    sender = Actor(**user)
+    response = await send_email(sender)
+    print(f'WORKER RESPONSE: {response}')
+
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         result = loop.run_until_complete(
-            send_email(sender=jesus)
+            create_user()
         )
     finally:
         loop.stop()
