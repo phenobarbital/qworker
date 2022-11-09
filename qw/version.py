@@ -1,5 +1,5 @@
 """Queue Worker Meta information.
-   Navigator Session allows us to store user-specific data into session object.
+   QueueWorker is a asyncio-based Worker for distributed functions.
 """
 
 __title__ = 'qworker'
