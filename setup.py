@@ -28,25 +28,25 @@ with open(version, 'r', encoding='utf-8') as meta:
         if len(node.targets) == 1:
             name = node.targets[0]
             if isinstance(name, ast.Name) and \
-                    name.id in (
-                            '__version__',
-                            '__title__',
-                            '__description__',
-                            '__author__',
-                            '__license__', '__author_email__'):
-                        v = node.value
-                        if name.id == '__version__':
-                            __version__ = v.s
-                        if name.id == '__title__':
-                            __title__ = v.s
-                        if name.id == '__description__':
-                            __description__ = v.s
-                        if name.id == '__license__':
-                            __license__ = v.s
-                        if name.id == '__author__':
-                            __author__ = v.s
-                        if name.id == '__author_email__':
-                            __author_email__ = v.s
+                name.id in (
+                    '__version__',
+                    '__title__',
+                    '__description__',
+                    '__author__',
+                    '__license__', '__author_email__'):
+                v = node.value
+                if name.id == '__version__':
+                    __version__ = v.s
+                if name.id == '__title__':
+                    __title__ = v.s
+                if name.id == '__description__':
+                    __description__ = v.s
+                if name.id == '__license__':
+                    __license__ = v.s
+                if name.id == '__author__':
+                    __author__ = v.s
+                if name.id == '__author_email__':
+                    __author_email__ = v.s
 
 COMPILE_ARGS = ["-O2"]
 
@@ -95,26 +95,26 @@ setup(
     author_email='jesuslara@phenobarbital.info',
     packages=find_packages(),
     setup_requires=[
-        'wheel==0.37.1',
+        'wheel==0.38.4',
         'cython==0.29.32'
     ],
     install_requires=[
-        'wheel==0.37.1',
         'asyncio==3.4.3',
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
         'cloudpickle==2.2.0',
         'jsonpickle==2.2.0',
         'cchardet==2.1.7',
-        'cryptography>=3.2',
+        'cryptography==38.0.4',
         'aiofile==3.8.1',
         'beautifulsoup4',
         'aioredis==2.0.1',
         'async-timeout==4.0.2',
-        'orjson==3.8.0',
+        'orjson==3.8.2',
         'msgpack==1.0.4',
         'serpent==1.41',
-        'navconfig>=1.0.0'
+        'asyncdb[default]>=2.1.30',
+        'navconfig>=1.0.6'
     ],
     ext_modules=cythonize(extensions),
     tests_require=[

@@ -2,12 +2,11 @@ venv:
 	python3.9 -m venv .venv
 	echo 'run `source .venv/bin/activate` to start develop Queue Workers.'
 
-setup:
-	pip install wheel==0.37.1
+install:
 	pip install -e .
 
 develop:
-	pip install wheel==0.37.1
+	pip install wheel==0.38.4
 	pip install -e .
 	pip install -Ur docs/requirements-dev.txt
 	flit install --symlink
