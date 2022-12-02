@@ -110,7 +110,7 @@ setup(
         'beautifulsoup4',
         'aioredis==2.0.1',
         'async-timeout==4.0.2',
-        'orjson==3.8.2',
+        'orjson==3.8.3',
         'msgpack==1.0.4',
         'serpent==1.41',
         'asyncdb[default]>=2.1.30',
