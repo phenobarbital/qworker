@@ -288,8 +288,19 @@ class QWorker:
         # first time: check signature:
         try:
             prefix = await reader.readline()
-            msglen = int(prefix)
-            
+            print(':: prefix ::')
+            print(type(prefix))           
+            if prefix: 
+                status = {
+                    "pong": "Empty data",
+                    "worker": {
+                        "name": self.name,
+                        "serving": addrs
+                    }
+                }
+                result = json_encoder(status)
+                await self.closing_writer(writer, result.encode('utf-8'))
+                return True 
             print(':: msglen ::')
             print(msglen)
             print(type(msglen))
