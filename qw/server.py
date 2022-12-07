@@ -288,6 +288,9 @@ class QWorker:
         # first time: check signature:
         try:
             prefix = await reader.readline()
+            print(':: prefix ::')
+            print(prefix)
+            print(type(prefix))
             if prefix == None: 
                 # its a simple keepalive:
                 status = {
@@ -300,7 +303,7 @@ class QWorker:
                 result = json_encoder(status)
                 await self.closing_writer(writer, result.encode('utf-8'))
                 return True 
-                
+
             msglen = int(prefix)
             payload = await reader.readexactly(msglen)
             if self.check_signature(payload) is False:
