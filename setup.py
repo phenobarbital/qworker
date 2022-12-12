@@ -103,7 +103,7 @@ setup(
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
         'cloudpickle==2.2.0',
-        'jsonpickle==2.2.0',
+        'jsonpickle==3.0.0',
         'cchardet==2.1.7',
         'cryptography==38.0.4',
         'aiofile==3.8.1',
