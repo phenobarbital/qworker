@@ -103,14 +103,14 @@ setup(
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
         'cloudpickle==2.2.0',
-        'jsonpickle==2.2.0',
+        'jsonpickle==3.0.0',
         'cchardet==2.1.7',
         'cryptography==38.0.4',
         'aiofile==3.8.1',
         'beautifulsoup4',
         'aioredis==2.0.1',
         'async-timeout==4.0.2',
-        'orjson==3.8.2',
+        'orjson==3.8.3',
         'msgpack==1.0.4',
         'serpent==1.41',
         'asyncdb[default]>=2.1.30',
@@ -120,8 +120,8 @@ setup(
     tests_require=[
             'pytest>=5.4.0',
             'coverage',
-            'pytest-asyncio==0.20.1',
-            'pytest-xdist==3.0.2',
+            'pytest-asyncio==0.20.3',
+            'pytest-xdist==3.1.0',
             'pytest-assume==2.4.2'
     ],
     entry_points={
