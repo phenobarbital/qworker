@@ -102,6 +102,7 @@ setup(
         'asyncio==3.4.3',
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
+        'navconfig[default]>=1.0.8',
         'cloudpickle==2.2.0',
         'jsonpickle==3.0.0',
         'cchardet==2.1.7',
@@ -112,9 +113,6 @@ setup(
         'async-timeout==4.0.2',
         'orjson==3.8.3',
         'msgpack==1.0.4',
-        'serpent==1.41',
-        'asyncdb[default]>=2.1.30',
-        'navconfig>=1.0.6'
     ],
     ext_modules=cythonize(extensions),
     tests_require=[
