@@ -36,17 +36,8 @@ async def test_client():
         warnings.warn(f'Unexpected Error on Queue Client: {err!s}')
         raise
 
-    tasks = ['health', 'keepalive']
-    t = random.choice(tasks)
-    print(f'SELECTED: {t}')
-    if t == 'health':
-        task = 'health'
-    else:
-        task = ''
-    print(f'produced: {task}')
-    # serialized_task = cloudpickle.dumps(task)
-    serialized_task = task.encode('utf-8')
-    writer.write(serialized_task)
+    task = ''.encode('utf-8')
+    writer.write(task)
     if writer.can_write_eof():
         writer.write_eof()
     await writer.drain()
@@ -76,10 +67,11 @@ async def test_client():
 if __name__ == '__main__':
     try:
         loop = asyncio.get_event_loop()
-        # print('Starting Client:')
-        for _ in range(10):
-            loop.run_until_complete(test_client())
-            time.sleep(0.1)
+        print('Starting Client:')
+        loop.run_until_complete(test_client())
+        # for _ in range(10):
+        #     loop.run_until_complete(test_client())
+        #     time.sleep(0.1)
     except KeyboardInterrupt:
         print('Request Finish: ')
     finally:

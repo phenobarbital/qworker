@@ -271,6 +271,20 @@ class QWorker:
         else:
             return False
 
+
+    async def response_keepalive(self, writer: asyncio.StreamWriter, status: dict = None) -> None:
+        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        if not status:
+            status = {
+                "pong": "Empty data",
+                "worker": {
+                    "name": self.name,
+                    "serving": addrs
+                }
+            }
+        result = json_encoder(status)
+        await self.closing_writer(writer, result.encode('utf-8'))
+
     async def connection_handler(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """ Handler for Function/Task Execution.
 
@@ -288,6 +302,10 @@ class QWorker:
         # first time: check signature:
         try:
             prefix = await reader.readline()
+            if not prefix:
+                # if no content on payload:
+                await self.response_keepalive(writer=writer)
+                return False
             msglen = int(prefix)
             payload = await reader.readexactly(msglen)
             if self.check_signature(payload) is False:
@@ -307,9 +325,26 @@ class QWorker:
                 writer.write('CONTINUE'.encode('utf-8'))
                 await writer.drain()
         except ValueError as err:
-            raise ConfigError(
+            if prefix == b'health':
+                status = {
+                    "queue": {
+                        "size": self.queue.qsize(),
+                        "full": self.queue.full(),
+                        "empty": self.queue.empty(),
+                        "consumers": len(self.consumers)
+                    },
+                    "worker": {
+                        "name": self.name,
+                        "address": self.server_address
+                    }
+                }
+                await self.response_keepalive(status=status, writer=writer)
+            exc = ConfigError(
                 f"QW Server: invalid or empty Signature WORKER_SECRET_KEY, err: {err!s}"
-            ) from err
+            )
+            result = cloudpickle.dumps(exc)
+            await self.closing_writer(writer, result)
+            return False
         except Exception as err: # pylint: disable=W0703
             logging.exception(f'Error Decoding Signature: {err}', stack_info=True)
         ## after: deserialize Task:
@@ -359,17 +394,10 @@ class QWorker:
                         "serving": addrs
                     }
                 }
+                await self.response_keepalive(status=status, writer=writer)
             else:
             # its a simple keepalive:
-                status = {
-                    "pong": "Empty data",
-                    "worker": {
-                        "name": self.name,
-                        "serving": addrs
-                    }
-                }
-            result = json_encoder(status)
-            await self.closing_writer(writer, result.encode('utf-8'))
+                await self.response_keepalive(writer=writer)
             return True
         elif isinstance(task, QueueWrapper):
             # Set Debug level of task:
