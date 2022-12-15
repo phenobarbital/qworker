@@ -14,7 +14,7 @@ import cloudpickle
 import jsonpickle
 import uvloop
 from navconfig.logging import logging
-from qw.exceptions import QWException, ParserError
+from qw.exceptions import QWException, ParserError, ConfigError
 from qw.utils import make_signature
 from .conf import (
     WORKER_DEFAULT_HOST,
@@ -306,6 +306,10 @@ class QWorker:
                 # passing a "continue" signal:
                 writer.write('CONTINUE'.encode('utf-8'))
                 await writer.drain()
+        except ValueError as err:
+            raise ConfigError(
+                f"QW Server: invalid or empty Signature WORKER_SECRET_KEY, err: {err!s}"
+            ) from err
         except Exception as err: # pylint: disable=W0703
             logging.exception(f'Error Decoding Signature: {err}', stack_info=True)
         ## after: deserialize Task:
