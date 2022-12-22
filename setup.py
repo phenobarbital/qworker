@@ -105,7 +105,7 @@ setup(
         'navconfig[default]>=1.0.8',
         'asyncdb[default]>=2.1.33',
         'cloudpickle==2.2.0',
-        'jsonpickle==3.0.0',
+        'jsonpickle==3.0.1',
         'cchardet==2.1.7',
         'aiofile==3.8.1',
         'beautifulsoup4',
