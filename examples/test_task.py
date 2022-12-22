@@ -53,8 +53,8 @@ if __name__ == '__main__':
     cPrint('Running Task ::: ')
     result = loop.run_until_complete(
         run_task(
-            program='test',
-            task='daily_postpaid',
+            program='epson',
+            task='retailers',
             debug=True,
             ignore_results=True
         )

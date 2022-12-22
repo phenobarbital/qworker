@@ -88,9 +88,7 @@ class TaskWrapper(QueueWrapper):
             }
             return result
         except Exception as err: # pylint: disable=W0703
-            print(err)
-            result = err
-            return result
+            return TaskFailed(str(err))
         finally:
             await self.close()
 
@@ -107,13 +105,15 @@ class TaskWrapper(QueueWrapper):
                     )
             except Exception as err:
                 logging.error(err)
-                raise TaskFailed(err) from err
+                raise TaskFailed(f"{err}") from err
             print(f'Executing Task {self.program}.{self.task}')
             try:
                 result = await task.run()
             except Exception as err:
-                logging.exception(err, stack_info=True)
-                raise
+                logging.exception(err, stack_info=False)
+                raise TaskFailed(
+                    f"{err}"
+                ) from err
         return result
 
     async def close(self):

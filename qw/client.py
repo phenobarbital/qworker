@@ -296,8 +296,11 @@ class QClient:
                     result = jsonpickle.decode(task_result)
                 else:
                     result = task_result
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as e:
+                print(e)
                 result = task_result
+            except Exception as e:
+                print(e)
             task_result = result
         except (ValueError, TypeError) as ex:
             raise ParserError(
@@ -322,6 +325,15 @@ class QClient:
                 except (TypeError, ValueError) as err:
                     res.append(el)
             return res
+        elif isinstance(task_result, dict):
+            # check if result is and error:
+            if 'exception' in task_result:
+                ex = task_result['exception']
+                if isinstance(ex, BaseException):
+                    msg = task_result['error']
+                    ex.message = msg
+                    raise ex
+            return task_result
         # elif isinstance(task_result, str):
         #     if newval:=is_parseable(task_result):
         #         val = newval(task_result)

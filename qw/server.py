@@ -453,8 +453,12 @@ class QWorker:
             ]
         try:
             if isinstance(result, BaseException):
+                result = {
+                    "exception": result,
+                    "error": result.message
+                }
                 # sending Task Exception
-                result = jsonpickle.encode(result)
+                # result = jsonpickle.encode(result)
             elif inspect.isgeneratorfunction(result) or isinstance(result, list):
                 try:
                     result = json_encoder(list(result))
@@ -462,7 +466,11 @@ class QWorker:
                     result = f"{result!r}" # cannot pickle a generator object
             result = cloudpickle.dumps(result)
         except Exception as err: # pylint: disable=W0703
-            result = cloudpickle.dumps(err)
+            error = {
+                "exception": err,
+                "error": str(err)
+            }
+            result = cloudpickle.dumps(error)
             logging.error(f'Error dumping result: {err!s}')
         await self.closing_writer(writer, result)
         return True
