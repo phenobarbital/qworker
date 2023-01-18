@@ -13,7 +13,8 @@ WORKER_DEFAULT_HOST = config.get('WORKER_DEFAULT_HOST', fallback='0.0.0.0')
 WORKER_DEFAULT_PORT = config.getint('WORKER_DEFAULT_PORT', fallback=8888)
 WORKER_DEFAULT_QTY = config.getint('WORKER_DEFAULT_QTY', fallback=4)
 WORKER_QUEUE_SIZE = config.getint('WORKER_QUEUE_SIZE', fallback=8)
-
+## ID for saving worker list on Redis
+QW_WORKER_LIST = 'QW_WORKER_LIST'
 
 ## Network Discovery:
 USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=True)

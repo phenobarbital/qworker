@@ -81,11 +81,12 @@ class QClient:
         self._loop = asyncio.get_event_loop()
         ## check if we use network discovery or redis list:
         if worker_list:
+            self._workers = worker_list
             self._worker_list = itertools.cycle(worker_list)
         else:
             if USE_DISCOVERY is True:
                 # get worker list from discovery:
-                self._worker_list = get_client_discovery()
+                self._workers, self._worker_list = get_client_discovery()
             else:
                 # starting redis:
                 self.redis = aioredis.ConnectionPool.from_url(
@@ -94,7 +95,7 @@ class QClient:
                         encoding='utf-8'
                 )
                 # getting the list from redis
-                self._worker_list = self.get_workers()
+                self._workers, self._worker_list = self.get_workers()
         if not self._worker_list:
             logging.warning(
                 'EMPTY WORKER LIST: Trying to connect to a default Worker'
@@ -102,26 +103,26 @@ class QClient:
             # try to connect with the default worker
             self._worker_list = [(WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT)]
         self._num_retries = defaultdict(int)
-        self._workers = round_robin_worker(self._worker_list)
+        self._worker = round_robin_worker(self._worker_list)
         self.timeout = timeout
 
     def discover_workers(self):
         if USE_DISCOVERY is True:
-            self._worker_list = get_client_discovery()
+            self._workers, self._worker_list = get_client_discovery()
 
     def get_workers(self):
         async def get_workers_list():
             conn = aioredis.Redis(connection_pool=self.redis)
-            self._worker_list = []
+            workers = []
             l = await conn.lrange(QW_WORKER_LIST, 0, 100)
             if l:
                 w = [orjson.loads(el) for el in l]
-                self._worker_list = [tuple(list(v.values())[0]) for v in w]
-            return itertools.cycle(self._worker_list)
+                workers = [tuple(list(v.values())[0]) for v in w]
+            return workers, itertools.cycle(workers)
         return self._loop.run_until_complete(get_workers_list())
 
     def get_servers(self) -> list:
-        return self._worker_list
+        return self._workers
 
     def register_pickle_module(self, module: Any):
         cloudpickle.register_pickle_by_value(module)
@@ -170,8 +171,6 @@ class QClient:
                 )
             except asyncio.TimeoutError:
                 # removing this worker from the self workers
-                if len(self._workers) > 0:
-                    self._workers.remove(worker)
                 warnings.warn(f"Timeout, skipping {worker!r}")
                 await asyncio.sleep(WAIT_TIME)
             except ConnectionRefusedError as ex:

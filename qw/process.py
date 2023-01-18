@@ -3,15 +3,21 @@ import multiprocessing as mp
 import resource as res
 import subprocess
 from collections.abc import Callable
+import socket
 import aioredis
 from navconfig.logging import logging
+from qw.exceptions import QWException
 from qw.discovery import get_server_discovery
 from .utils.json import json_encoder
-from .conf import NOFILES, WORKER_REDIS
+from .conf import (
+    NOFILES,
+    WORKER_REDIS,
+    QW_WORKER_LIST,
+    WORKER_DISCOVERY_PORT
+)
 
 from .server import start_server
 
-QW_WORKER_LIST = 'QW_WORKER_LIST'
 JOB_LIST = []
 
 def raise_nofile(value: int = 4096) -> tuple[str, int]:
@@ -44,10 +50,13 @@ class spawn_process(object):
     def __init__(self, args, event_loop):
         self.loop: asyncio.AbstractEventLoop = event_loop
         self.host: str = args.host
+        self.address = socket.gethostbyname(socket.gethostname())
         self.port: int = args.port
-        self.worker: str = args.wkname
+        self.worker: str = f"{args.wkname}-{args.port}"
         self.debug: bool = args.debug
         self.redis: Callable = None
+        self.discovery_server: Callable = None
+        self.transport: asyncio.Transport = None
         # increase the ulimit of server
         raise_nofile(value=NOFILES)
         for i in range(args.workers):
@@ -73,23 +82,41 @@ class spawn_process(object):
 
     async def stop_redis(self):
         try:
+            conn = aioredis.Redis(connection_pool=self.redis)
+            await conn.delete(
+                QW_WORKER_LIST
+            )
             await self.redis.disconnect(inuse_connections = True)
         except Exception as err: # pylint: disable=W0703
             logging.exception(err)
 
     async def register_worker(self):
-        worker = {
-            self.worker: (self.host, self.port)
-        }
+        worker = json_encoder({
+            self.worker: (self.address, self.port)
+        })
         conn = aioredis.Redis(connection_pool=self.redis)
         await conn.lpush(
             QW_WORKER_LIST,
-            json_encoder(worker)
+            worker
         )
+        if self.discovery_server:
+            self.discovery_server.register_worker(
+                server=self.worker, addr=(self.address, self.port)
+            )
+        else:
+            # self-registration into Discovery Service:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            srv_addr = ('', WORKER_DISCOVERY_PORT)
+            try:
+                sock.sendto(worker.encode(), srv_addr)
+            except socket.timeout as ex:
+                raise QWException(
+                    "Unable to register Worker on this Network."
+                ) from ex
 
     async def remove_worker(self):
         worker = {
-            self.worker: (self.host, self.port)
+            self.worker: (self.address, self.port)
         }
         conn = aioredis.Redis(connection_pool=self.redis)
         await conn.lrem(
@@ -97,6 +124,10 @@ class spawn_process(object):
             1,
             json_encoder(worker)
         )
+        if self.discovery_server:
+            self.discovery_server.remove_worker(
+                server=self.worker
+            )
 
     def start(self):
         try:
@@ -104,12 +135,16 @@ class spawn_process(object):
             self.loop.run_until_complete(
                 self.start_redis()
             )
+            try:
+                self.transport, self.discovery_server = self.loop.run_until_complete(
+                    get_server_discovery(event_loop=self.loop)
+                )
+                print(':: Starting Discovery Server ::')
+            except Exception:
+                pass
             # register worker in the worker list
             self.loop.run_until_complete(
                 self.register_worker()
-            )
-            self.loop.run_until_complete(
-                get_server_discovery(event_loop=self.loop)
             )
         except Exception as err: # pylint: disable=W0703
             logging.error(err)
@@ -122,6 +157,8 @@ class spawn_process(object):
             self.loop.run_until_complete(
                 self.stop_redis()
             )
+            if self.transport:
+                self.transport.close()
         except Exception as err: # pylint: disable=W0703
             logging.exception(err)
         for j in JOB_LIST:

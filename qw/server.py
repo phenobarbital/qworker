@@ -11,7 +11,6 @@ from functools import partial
 from collections.abc import Callable
 
 import cloudpickle
-import jsonpickle
 import uvloop
 from navconfig.logging import logging
 from qw.exceptions import QWException, ParserError, ConfigError
@@ -25,6 +24,7 @@ from .conf import (
     WORKER_SECRET_KEY
 )
 from .utils.json import json_encoder
+from .utils.versions import get_versions
 from .utils import cPrint
 from .wrappers import QueueWrapper, FuncWrapper, TaskWrapper
 
@@ -393,6 +393,24 @@ class QWorker:
                         "address": self.server_address,
                         "serving": addrs
                     }
+                }
+                await self.response_keepalive(status=status, writer=writer)
+            elif task == 'check_state':
+                ## checking the current state of Worker:
+                ## TODO: add last executed task
+                status = {
+                    "versions": get_versions(),
+                    "worker": {
+                        "name": self.name,
+                        "address": self.server_address,
+                        "serving": addrs
+                    },
+                    "queue": {
+                        "size": self.queue.qsize(),
+                        "full": self.queue.full(),
+                        "empty": self.queue.empty(),
+                        "consumers": len(self.consumers)
+                    },
                 }
                 await self.response_keepalive(status=status, writer=writer)
             else:
