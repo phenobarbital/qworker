@@ -101,9 +101,10 @@ class QClient:
                 'EMPTY WORKER LIST: Trying to connect to a default Worker'
             )
             # try to connect with the default worker
-            self._worker_list = [(WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT)]
+            self._workers = [(WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT)]
+            self._worker_list = itertools.cycle(self._workers)
         self._num_retries = defaultdict(int)
-        self._worker = round_robin_worker(self._worker_list)
+        self._worker = None
         self.timeout = timeout
 
     def discover_workers(self):
@@ -171,6 +172,7 @@ class QClient:
                 )
             except asyncio.TimeoutError:
                 # removing this worker from the self workers
+                # TODO: removing bad worker:
                 warnings.warn(f"Timeout, skipping {worker!r}")
                 await asyncio.sleep(WAIT_TIME)
             except ConnectionRefusedError as ex:

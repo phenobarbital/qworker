@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 from itertools import cycle
+import random
 import socket
 import struct
 from navconfig.logging import logging
@@ -113,4 +114,5 @@ def get_client_discovery() -> tuple:
         ) from ex
     finally:
         sock.close()
+        random.shuffle(server_list)
         return server_list, cycle(server_list) # pylint: disable=W0150
