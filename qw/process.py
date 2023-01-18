@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 import multiprocessing as mp
 import resource as res
 import subprocess
@@ -8,6 +9,7 @@ import aioredis
 from navconfig.logging import logging
 from qw.exceptions import QWException
 from qw.discovery import get_server_discovery
+from .utils import cPrint
 from .utils.json import json_encoder
 from .conf import (
     NOFILES,
@@ -51,6 +53,7 @@ class spawn_process(object):
         self.loop: asyncio.AbstractEventLoop = event_loop
         self.host: str = args.host
         self.address = socket.gethostbyname(socket.gethostname())
+        self.id = str(uuid.uuid1())
         self.port: int = args.port
         self.worker: str = f"{args.wkname}-{args.port}"
         self.debug: bool = args.debug
@@ -92,7 +95,7 @@ class spawn_process(object):
 
     async def register_worker(self):
         worker = json_encoder({
-            self.worker: (self.address, self.port)
+            self.id: (self.address, self.port)
         })
         conn = aioredis.Redis(connection_pool=self.redis)
         await conn.lpush(
@@ -101,7 +104,7 @@ class spawn_process(object):
         )
         if self.discovery_server:
             self.discovery_server.register_worker(
-                server=self.worker, addr=(self.address, self.port)
+                server=self.id, addr=(self.address, self.port)
             )
         else:
             # self-registration into Discovery Service:
@@ -116,7 +119,7 @@ class spawn_process(object):
 
     async def remove_worker(self):
         worker = {
-            self.worker: (self.address, self.port)
+            self.id: (self.address, self.port)
         }
         conn = aioredis.Redis(connection_pool=self.redis)
         await conn.lrem(
@@ -126,7 +129,7 @@ class spawn_process(object):
         )
         if self.discovery_server:
             self.discovery_server.remove_worker(
-                server=self.worker
+                server=self.id
             )
 
     def start(self):
@@ -139,7 +142,7 @@ class spawn_process(object):
                 self.transport, self.discovery_server = self.loop.run_until_complete(
                     get_server_discovery(event_loop=self.loop)
                 )
-                print(':: Starting Discovery Server ::')
+                cPrint(':: Starting Discovery Server ::', level='WARN')
             except Exception:
                 pass
             # register worker in the worker list

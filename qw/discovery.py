@@ -6,6 +6,7 @@ import socket
 import struct
 from navconfig.logging import logging
 from qw.exceptions import QWException
+from qw.utils import cPrint
 from qw.utils.json import json_encoder, json_decoder
 from .conf import (
     WORKER_DISCOVERY_HOST,
@@ -98,7 +99,7 @@ def get_client_discovery() -> tuple:
             data, server = sock.recvfrom(4096)
             if data.decode('utf-8') == expected_message:
                 srv, port = server
-                print(':: Discovery Server: ' + str(srv) )
+                cPrint(f':: Discovery Server: {srv}' )
                 sock.sendto('list_workers'.encode(), (srv, port))
                 # ask for a list of servers:
                 # TODO: detect which port is used by this server:
