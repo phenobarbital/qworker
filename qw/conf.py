@@ -42,7 +42,9 @@ WORKER_HIGH_LIST = get_worker_list(HIGH_LIST)
 # upgrade no-files
 NOFILES = config.getint('ULIMIT_NOFILES', fallback=16384)
 
+PACKAGE_LIST = config.getlist('PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig'))
+
 try:
-    from settings.settings import WORKER_LIST, WORKER_HIGH_LIST, WORKER_REDIS, WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT # pylint: disable=W0611
+    from settings.settings import WORKER_LIST, WORKER_HIGH_LIST, WORKER_REDIS, WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT, PACKAGE_LIST # pylint: disable=W0611
 except ImportError:
     pass

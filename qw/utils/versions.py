@@ -3,9 +3,7 @@
 Extract the version of all required packages and showed in a response.
 """
 import importlib
-
-# TODO: Add Qworker, Scheduler and other DI packages.
-package_list = ('asyncdb', 'qw', 'querysource', 'navconfig')
+from qw.conf import PACKAGE_LIST
 
 
 def get_versions():
@@ -21,7 +19,7 @@ def get_versions():
             description: list of packages and versions.
     """
     versions = {}
-    for package in package_list:
+    for package in PACKAGE_LIST:
         mdl = importlib.import_module(f'{package}.version', package='version')
         obj = getattr(mdl, '__version__')
         versions[package] = obj
