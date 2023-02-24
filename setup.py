@@ -119,7 +119,7 @@ setup(
             'coverage',
             'pytest-asyncio==0.20.3',
             'pytest-xdist==3.1.0',
-            'pytest-assume==2.4.2'
+            'pytest-assume==2.4.3'
     ],
     entry_points={
         'console_scripts': [
