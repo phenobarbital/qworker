@@ -96,17 +96,16 @@ setup(
     packages=find_packages(exclude=["contrib", "docs", "tests", "settings"]),
     setup_requires=[
         'wheel==0.38.4',
-        'cython==0.29.32'
+        'cython==0.29.33'
     ],
     install_requires=[
         'asyncio==3.4.3',
         'uvloop==0.17.0',
         'ciso8601>=2.2.0',
-        'navconfig[default]>=2.1.38',
-        'asyncdb[default]>=2.1.38',
+        'navconfig[default]>=1.1.0',
+        'asyncdb[default]>=2.2.0',
         'cloudpickle==2.2.1',
         'jsonpickle==3.0.1',
-        'cchardet==2.1.7',
         'aiofile==3.8.1',
         'beautifulsoup4==4.11.2',
         'aioredis==2.0.1',
@@ -114,13 +113,6 @@ setup(
         'msgpack==1.0.4',
     ],
     ext_modules=cythonize(extensions),
-    tests_require=[
-            'pytest>=5.4.0',
-            'coverage',
-            'pytest-asyncio==0.20.3',
-            'pytest-xdist==3.1.0',
-            'pytest-assume==2.4.2'
-    ],
     entry_points={
         'console_scripts': [
             'qw = qw.__main__:main'
