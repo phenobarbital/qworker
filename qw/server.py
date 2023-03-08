@@ -129,7 +129,7 @@ class QWorker:
                 port=self.port,
                 family=socket.AF_INET,
                 reuse_port=True,
-                loop=self._loop
+                # loop=self._loop
             )
         # server
         self._server = await coro
