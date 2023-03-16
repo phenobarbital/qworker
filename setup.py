@@ -106,7 +106,7 @@ setup(
         'asyncdb[default]>=2.2.0',
         'cloudpickle==2.2.1',
         'jsonpickle==3.0.1',
-        'aiofile==3.8.1',
+        'aiofile==3.8.5',
         'beautifulsoup4==4.11.2',
         'aioredis==2.0.1',
         'async-timeout==4.0.2',
