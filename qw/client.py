@@ -12,7 +12,6 @@ import cloudpickle
 import jsonpickle
 import orjson
 import uvloop
-# from dataintegration.utils.parserqs import is_parseable
 from navconfig.logging import logging
 from qw.discovery import get_client_discovery
 from qw.utils import make_signature
@@ -47,7 +46,7 @@ def random_worker(workers):
         try:
             yield random.choice(workers)
         except (ValueError, TypeError) as ex:
-            raise Exception(
+            raise QWException(
                 "Cannot launch Work on Empty Worker List"
             ) from ex
 
@@ -57,7 +56,7 @@ def round_robin_worker(workers):
         try:
             return next(workers)
         except (ValueError, TypeError) as ex:
-            raise Exception(
+            raise QWException(
                 f"Bad Worker list: {ex}"
             ) from ex
         except StopIteration:
@@ -408,7 +407,9 @@ class QClient:
                     if reader.at_eof():
                         break
             except Exception as err:
-                raise Exception from err
+                raise QWException(
+                    str(err)
+                ) from err
             finally:
                 await self.close(writer)
             received = cloudpickle.loads(serialized_result)

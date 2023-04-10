@@ -5,8 +5,8 @@ Wrapping a DI-task to be executed by Worker.
 import multiprocessing as mp
 from navconfig.logging import logging
 try:
-    from dataintegration.task import Task
-    from dataintegration.exceptions import (
+    from flowtask.tasks.task import Task
+    from flowtask.exceptions import (
         TaskNotFound,
         TaskError,
         TaskFailed
