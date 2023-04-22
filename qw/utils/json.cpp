@@ -990,6 +990,7 @@ struct __pyx_obj_2qw_10exceptions_QWException;
 struct __pyx_obj_2qw_10exceptions_ConfigError;
 struct __pyx_obj_2qw_10exceptions_ParserError;
 struct __pyx_obj_2qw_10exceptions_DiscardedTask;
+struct __pyx_obj_2qw_10exceptions_ProcessNotFound;
 struct __pyx_obj_2qw_5utils_4json_JSONContent;
 
 /* "qw/exceptions.pxd":5
@@ -1036,6 +1037,18 @@ struct __pyx_obj_2qw_10exceptions_ParserError {
  *     pass
  */
 struct __pyx_obj_2qw_10exceptions_DiscardedTask {
+  struct __pyx_obj_2qw_10exceptions_QWException __pyx_base;
+};
+
+
+/* "qw/exceptions.pxd":20
+ *     pass
+ * 
+ * cdef class ProcessNotFound(QWException):             # <<<<<<<<<<<<<<
+ *     """Process was not found."""
+ *     pass
+ */
+struct __pyx_obj_2qw_10exceptions_ProcessNotFound {
   struct __pyx_obj_2qw_10exceptions_QWException __pyx_base;
 };
 
@@ -1499,6 +1512,7 @@ static PyTypeObject *__pyx_ptype_2qw_10exceptions_QWException = 0;
 static PyTypeObject *__pyx_ptype_2qw_10exceptions_ConfigError = 0;
 static PyTypeObject *__pyx_ptype_2qw_10exceptions_ParserError = 0;
 static PyTypeObject *__pyx_ptype_2qw_10exceptions_DiscardedTask = 0;
+static PyTypeObject *__pyx_ptype_2qw_10exceptions_ProcessNotFound = 0;
 
 /* Module declarations from 'qw.utils.json' */
 static PyTypeObject *__pyx_ptype_2qw_5utils_4json_JSONContent = 0;
@@ -4085,6 +4099,8 @@ static int __Pyx_modinit_type_import_code(void) {
    if (!__pyx_ptype_2qw_10exceptions_ParserError) __PYX_ERR(2, 13, __pyx_L1_error)
   __pyx_ptype_2qw_10exceptions_DiscardedTask = __Pyx_ImportType(__pyx_t_1, "qw.exceptions", "DiscardedTask", sizeof(struct __pyx_obj_2qw_10exceptions_DiscardedTask), __Pyx_ImportType_CheckSize_Warn);
    if (!__pyx_ptype_2qw_10exceptions_DiscardedTask) __PYX_ERR(2, 16, __pyx_L1_error)
+  __pyx_ptype_2qw_10exceptions_ProcessNotFound = __Pyx_ImportType(__pyx_t_1, "qw.exceptions", "ProcessNotFound", sizeof(struct __pyx_obj_2qw_10exceptions_ProcessNotFound), __Pyx_ImportType_CheckSize_Warn);
+   if (!__pyx_ptype_2qw_10exceptions_ProcessNotFound) __PYX_ERR(2, 20, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_RefNannyFinishContext();
   return 0;
