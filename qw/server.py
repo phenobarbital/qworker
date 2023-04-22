@@ -2,18 +2,24 @@
 import asyncio
 import inspect
 import multiprocessing as mp
+from collections.abc import Callable
 import os
 import queue
 import socket
 import uuid
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
-from collections.abc import Callable
-
+import resource
+import psutil
 import cloudpickle
 import uvloop
 from navconfig.logging import logging
-from qw.exceptions import QWException, ParserError, ConfigError
+from qw.exceptions import (
+    QWException,
+    ParserError,
+    ConfigError,
+    DiscardedTask
+)
 from qw.utils import make_signature
 from .conf import (
     WORKER_DEFAULT_HOST,
@@ -21,7 +27,9 @@ from .conf import (
     WORKER_DEFAULT_QTY,
     WORKER_QUEUE_SIZE,
     expected_message,
-    WORKER_SECRET_KEY
+    WORKER_SECRET_KEY,
+    RESOURCE_THRESHOLD,
+    CHECK_RESOURCE_USAGE
 )
 from .utils.json import json_encoder
 from .utils.versions import get_versions
@@ -107,6 +115,26 @@ class QWorker:
     @property
     def name(self):
         return self._name
+
+    def get_resource_usage(self):
+        if CHECK_RESOURCE_USAGE is True:
+            soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+            print('SOFT ', soft)
+            processes = psutil.process_iter()
+            used = 0
+            try:
+                for ps in processes:
+                    try:
+                        num_fds = len(ps.open_files())
+                        used += num_fds
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                        pass
+                print('CALC ', used)
+                return (used / soft) * 100
+            except (ValueError, RuntimeError):
+                pass
+        else:
+            return True
 
     async def start(self):
         """Starts Queue Manager."""
@@ -274,12 +302,15 @@ class QWorker:
 
     async def response_keepalive(self, writer: asyncio.StreamWriter, status: dict = None) -> None:
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        prct_used = self.get_resource_usage()
+        logging.debug(f'{self.name}: {prct_used:.2f}%')
         if not status:
             status = {
                 "pong": "Empty data",
                 "worker": {
                     "name": self.name,
-                    "serving": addrs
+                    "serving": addrs,
+                    "resource": f"{prct_used:.2f}%"
                 }
             }
         result = json_encoder(status)
@@ -321,6 +352,21 @@ class QWorker:
                 )
                 return False
             else:
+                prct_used = self.get_resource_usage()
+                logging.debug(f'Current NFILE percent: {prct_used}')
+                if prct_used >= int(RESOURCE_THRESHOLD):
+                    logging.error(
+                        f'Discarted Task from {addr} due Resource usage: {prct_used}'
+                    )
+                    exc = DiscardedTask(
+                        f'Too many Open Files: {prct_used:.2f}% usage.'
+                    )
+                    result = cloudpickle.dumps(exc)
+                    await self.closing_writer(
+                        writer,
+                        result
+                    )
+                    return False
                 # passing a "continue" signal:
                 writer.write('CONTINUE'.encode('utf-8'))
                 await writer.drain()

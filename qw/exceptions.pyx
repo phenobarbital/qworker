@@ -31,3 +31,7 @@ cdef class ParserError(QWException):
 
     def __init__(self, str message = None):
         super().__init__(message or f"JSON Parser Error", status=410)
+
+cdef class DiscardedTask(QWException):
+    def __init__(self, str message = None):
+        super().__init__(message or f"Task was Discarded", status=408)

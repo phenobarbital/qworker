@@ -13,6 +13,9 @@ WORKER_DEFAULT_HOST = config.get('WORKER_DEFAULT_HOST', fallback='0.0.0.0')
 WORKER_DEFAULT_PORT = config.getint('WORKER_DEFAULT_PORT', fallback=8888)
 WORKER_DEFAULT_QTY = config.getint('WORKER_DEFAULT_QTY', fallback=4)
 WORKER_QUEUE_SIZE = config.getint('WORKER_QUEUE_SIZE', fallback=8)
+RESOURCE_THRESHOLD = config.getint('RESOURCE_THRESHOLD', fallback=90)
+CHECK_RESOURCE_USAGE = config.getboolean('CHECK_RESOURCE_USAGE', fallback=True)
+
 ## ID for saving worker list on Redis
 QW_WORKER_LIST = 'QW_WORKER_LIST'
 
