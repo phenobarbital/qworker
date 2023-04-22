@@ -35,3 +35,7 @@ cdef class ParserError(QWException):
 cdef class DiscardedTask(QWException):
     def __init__(self, str message = None):
         super().__init__(message or f"Task was Discarded", status=408)
+
+cdef class ProcessNotFound(QWException):
+    def __init__(self, str message = None):
+        super().__init__(message or f"Task Not Found", status=404)

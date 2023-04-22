@@ -256,10 +256,7 @@ class QWorker:
         except Exception as err: # pylint: disable=W0703
             result = err
         finally:
-            try:
-                await task.close()
-            except Exception: # pylint: disable=W0703
-                pass
+            await task.close()
         print(f'RUN TASK {task!s} RESULT> ', result)
         return result
 

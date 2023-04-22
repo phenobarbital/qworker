@@ -15,6 +15,7 @@ except ImportError:
     logging.warning(
         "Unable to Load DataIntegrator Task Component, we can't send DI Tasks to any Worker."
     )
+from qw.exceptions import ProcessNotFound, QWException
 from .base import QueueWrapper
 
 class TaskWrapper(QueueWrapper):
@@ -60,13 +61,17 @@ class TaskWrapper(QueueWrapper):
                 debug=self._debug,
                 **self.kwargs
             )
-        except TaskNotFound:
-            raise
+        except TaskNotFound as ex:
+            raise ProcessNotFound(
+                f"Task Not Found: {ex}"
+            )
         except TaskError:
             raise
         except Exception as err:
             logging.exception(err, stack_info=True)
-            raise
+            raise QWException(
+                f"{err}"
+            ) from err
 
     def __await__(self):
         return self.__call__().__await__()
@@ -118,8 +123,9 @@ class TaskWrapper(QueueWrapper):
 
     async def close(self):
         try:
-            await self._task.close()
-            del self._task
+            if self._task:
+                await self._task.close()
+                self._task = None
         except Exception as err: # pylint: disable=W0703
             logging.error(err)
 
