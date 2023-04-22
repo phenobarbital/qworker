@@ -17,7 +17,8 @@ from qw.discovery import get_client_discovery
 from qw.utils import make_signature
 from qw.exceptions import (
     ParserError,
-    QWException
+    QWException,
+    DiscardedTask
 )
 from .conf import (
     WORKER_DEFAULT_HOST,
@@ -169,6 +170,11 @@ class QClient:
                 return await self.validate_connection(
                     reader, writer
                 )
+            except DiscardedTask as exc:
+                logging.warning(
+                    f'Task was discarded, {exc!s}, retrying'
+                )
+                raise
             except asyncio.TimeoutError:
                 # removing this worker from the self workers
                 # TODO: removing bad worker:
@@ -235,6 +241,10 @@ class QClient:
             Exception: Any Unhandled error.
         """
         try:
+            reader, writer = await self.get_connection()
+        except DiscardedTask:
+            await asyncio.sleep(WAIT_TIME)
+            ### ask again after wait for new connection:
             reader, writer = await self.get_connection()
         except ConnectionError as ex:
             raise ConnectionError(
@@ -375,6 +385,10 @@ class QClient:
         """
         # TODO: Use Task id to return (later) the result of Task.
         try:
+            reader, writer = await self.get_connection()
+        except DiscardedTask:
+            await asyncio.sleep(WAIT_TIME)
+            ### ask again after wait for new connection:
             reader, writer = await self.get_connection()
         except Exception as err:
             logging.error(err)

@@ -12,3 +12,7 @@ cdef class ConfigError(QWException):
 
 cdef class ParserError(QWException):
     pass
+
+cdef class DiscardedTask(QWException):
+    """Usable to patch Discarded tasks."""
+    pass

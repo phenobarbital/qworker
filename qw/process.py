@@ -28,14 +28,13 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
     sets nofile soft limit to at least 4096.
     """
     soft, hard = res.getrlimit(res.RLIMIT_NOFILE)
-    # print(f'getting hard ulimit -n {soft} {hard}')
     if soft < value:
         soft = value
 
     if hard < soft:
         hard = soft
     try:
-        print(f'setting soft & hard ulimit -n {soft} {hard}')
+        print(f'Setting soft & hard ulimit -n {soft} {hard}')
         res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
     except (ValueError, AttributeError) as err:
         logging.exception(err)
@@ -43,7 +42,7 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
             ulimit = 'ulimit -{type} {value};'
             subprocess.Popen(ulimit.format(type='n', value=hard), shell=True)
         except Exception as e: # pylint: disable=W0703
-            print('failed to set ulimit, giving up')
+            print('Failed to set ulimit, giving up')
             logging.exception(e, stack_info=False)
     return 'nofile', (soft, hard)
 
