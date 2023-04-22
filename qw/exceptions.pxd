@@ -16,3 +16,7 @@ cdef class ParserError(QWException):
 cdef class DiscardedTask(QWException):
     """Usable to patch Discarded tasks."""
     pass
+
+cdef class ProcessNotFound(QWException):
+    """Process was not found."""
+    pass
