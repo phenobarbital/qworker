@@ -119,7 +119,6 @@ class QWorker:
     def get_resource_usage(self):
         if CHECK_RESOURCE_USAGE is True:
             soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
-            print('SOFT ', soft)
             processes = psutil.process_iter()
             used = 0
             try:
@@ -129,7 +128,6 @@ class QWorker:
                         used += num_fds
                     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                         pass
-                print('CALC ', used)
                 return (used / soft) * 100
             except (ValueError, RuntimeError):
                 pass
@@ -300,7 +298,7 @@ class QWorker:
     async def response_keepalive(self, writer: asyncio.StreamWriter, status: dict = None) -> None:
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
         prct_used = self.get_resource_usage()
-        logging.debug(f'{self.name}: {prct_used:.2f}%')
+        ### logging.debug(f'{self.name}: {prct_used:.2f}%')
         if not status:
             status = {
                 "pong": "Empty data",
@@ -325,7 +323,7 @@ class QWorker:
             Task Result.
         """
         # # TODO: task can select which executor to use, else use default:
-        print(f':: Starting Handler on worker {self.name!s} ::')
+        # print(f':: Starting Handler on worker {self.name!s} ::')
         addr = writer.get_extra_info("peername")
         # first time: check signature:
         try:
@@ -415,7 +413,9 @@ class QWorker:
             await self.closing_writer(writer, result.encode('utf-8'))
             return True
         except Exception as err: # pylint: disable=W0703
-            exc = Exception(f'No Valid Function was sent to Worker: {err}')
+            exc = Exception(
+                f'No Valid Function was sent to Worker: {err}'
+            )
             result = cloudpickle.dumps(exc)
             await self.closing_writer(writer, result)
             return False

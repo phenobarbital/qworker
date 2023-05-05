@@ -5,7 +5,7 @@
 __title__ = 'qworker'
 __description__ = ('QueueWorker is asynchronous Task Queue implementation built on to of Asyncio.'
                    'Can you spawn distributed workers to run functions inside workers.')
-__version__ = '1.6.5'
+__version__ = '1.6.6'
 __author__ = 'Jesus Lara'
 __author_email__ = 'jesuslarag@gmail.com'
 __license__ = 'MIT'
