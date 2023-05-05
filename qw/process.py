@@ -34,7 +34,7 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
     if hard < soft:
         hard = soft
     try:
-        print(f'Setting soft & hard ulimit -n {soft} {hard}')
+        ## print(f'Setting soft & hard ulimit -n {soft} {hard}')
         res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
     except (ValueError, AttributeError) as err:
         logging.exception(err)
