@@ -1,6 +1,5 @@
 """QueueWorker Server Implementation"""
 import os
-import queue
 import socket
 import uuid
 import asyncio
@@ -21,6 +20,7 @@ from qw.exceptions import (
     DiscardedTask
 )
 from qw.utils import make_signature
+from .protocols import QueueProtocol
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -34,52 +34,16 @@ from .conf import (
 from .utils.json import json_encoder
 from .utils.versions import get_versions
 from .utils import cPrint
-from .wrappers import QueueWrapper, FuncWrapper, TaskWrapper
+from .wrappers import (
+    QueueWrapper,
+    FuncWrapper,
+    TaskWrapper
+)
 
 
 DEFAULT_HOST = WORKER_DEFAULT_HOST
 if not DEFAULT_HOST:
     DEFAULT_HOST = socket.gethostbyname(socket.gethostname())
-
-
-def start_server(num_worker, host, port, debug: bool):
-    """thread worker function"""
-    loop = None
-    worker = None
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    except RuntimeError:
-        raise QWException(
-            f"Unable to set an event loop: {ex}"
-        )
-    try:
-        worker = QWorker(
-            host=host,
-            port=port,
-            event_loop=loop,
-            debug=debug,
-            worker_id=num_worker
-        )
-        loop.run_until_complete(
-            worker.start()
-        )
-    except (OSError, RuntimeError) as ex:
-        raise QWException(
-            f"Unable to Spawn a new Worker: {ex}"
-        )
-    except KeyboardInterrupt:
-        if loop and worker:
-            worker.logger.info(
-                f'Shutting down Worker {worker.name if worker else "unknown"}'
-            )
-            loop.run_until_complete(
-                worker.shutdown()
-            )
-    finally:
-        if loop:
-            loop.close()  # Close the event loop
-
 
 class QWorker:
     """Queue Task Worker server.
@@ -114,18 +78,68 @@ class QWorker:
         self._executor = ThreadPoolExecutor(
             max_workers=WORKER_DEFAULT_QTY
         )
-        if not event_loop:
-            self._loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self._loop)
-        else:
-            self._loop = event_loop
+        self._loop = event_loop if event_loop else asyncio.new_event_loop()
         self._server: Callable = None
         self._pid = os.getpid()
         self._protocol = protocol
+        # logging:
+        self.logger = logging.getLogger(
+            f'QW:Server:{self._name}:{self._id}'
+        )
 
     @property
     def name(self):
         return self._name
+
+    async def start(self):
+        """Starts Queue Manager."""
+        self.queue = asyncio.Queue(maxsize=WORKER_QUEUE_SIZE)
+        self.executor = ProcessPoolExecutor(
+            max_workers=WORKER_DEFAULT_QTY
+        )
+        try:
+            if self._protocol:
+                self._server = await self._loop.create_server(
+                    self._protocol,
+                    host=self.host,
+                    port=self.port,
+                    family=socket.AF_INET,
+                    reuse_port=True
+                )
+            else:
+                self._server = await asyncio.start_server(
+                    self.connection_handler,
+                    host=self.host,
+                    port=self.port,
+                    family=socket.AF_INET,
+                    reuse_port=True,
+                    # loop=self._loop
+                )
+            self.server_address = (
+                socket.gethostbyname(socket.gethostname()), self.port
+            )
+            sock = self._server.sockets[0].getsockname()
+            self.logger.info(
+                f'Serving {self._name}:{self._id} on {sock}, pid: {self._pid}'
+            )
+        except Exception as err:
+            raise QWException(
+                f"Error: {err}"
+            ) from err
+        # Serve requests until Ctrl+C is pressed
+        try:
+            await self.fire_consumers()
+            async with self._server:
+                await self._server.serve_forever()
+        except (RuntimeError, KeyboardInterrupt) as err:
+            self.logger.exception(err, stack_info=True)
+
+    async def fire_consumers(self):
+        """Fire up the Task consumers."""
+        self.consumers = [
+            asyncio.create_task(
+                self.task_handler(self.queue)) for _ in range(WORKER_QUEUE_SIZE - 1)
+        ]
 
     def get_resource_usage(self):
         if CHECK_RESOURCE_USAGE is True:
@@ -137,7 +151,11 @@ class QWorker:
                     try:
                         num_fds = len(ps.open_files())
                         used += num_fds
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    except (
+                        psutil.NoSuchProcess,
+                        psutil.AccessDenied,
+                        psutil.ZombieProcess
+                    ):
                         pass
                 return (used / soft) * 100
             except (ValueError, RuntimeError):
@@ -145,70 +163,18 @@ class QWorker:
         else:
             return True
 
-    async def start(self):
-        """Starts Queue Manager."""
-        self.queue = asyncio.Queue(maxsize=WORKER_QUEUE_SIZE)
-        self.executor = ProcessPoolExecutor(
-            max_workers=WORKER_DEFAULT_QTY
-        )
-        if self._protocol:
-            coro = self._loop.create_server(
-                self._protocol,
-                host=self.host,
-                port=self.port,
-                family=socket.AF_INET,
-                reuse_port=True
-            )
-        else:
-            coro = asyncio.start_server(
-                self.connection_handler,
-                host=self.host,
-                port=self.port,
-                family=socket.AF_INET,
-                reuse_port=True,
-                # loop=self._loop
-            )
-        # server
-        self._server = await coro
-        self.server_address = (socket.gethostbyname(socket.gethostname()), self.port)
-        try:
-            await self.fire_consumers()
-            sock = self._server.sockets[0].getsockname()
-            logging.info(
-                f'Serving {self._name}:{self._id} on {sock}, pid: {self._pid}'
-            )
-        except Exception as err:
-            logging.error(err)
-            raise QWException(
-                f"Error: {err}"
-            ) from err
-        # Serve requests until Ctrl+C is pressed
-        try:
-            async with self._server:
-                await self._server.serve_forever()
-        except RuntimeError as err:
-            logging.exception(err, stack_info=True)
-
-    async def fire_consumers(self):
-        """Fire up the Task consumers."""
-        self.consumers = [
-            asyncio.create_task(
-                self.task_handler(self.queue)) for _ in range(WORKER_QUEUE_SIZE)
-        ]
-
     async def empty_queue(self, q: asyncio.Queue):
         """Processing and shutting down the Queue."""
-        for _ in range(q.qsize()):
-            try:
-                q.get_nowait()
-                q.task_done()
-            except queue.Empty:
-                pass
+        while not q.empty():
+            q.get_nowait()
+            q.task_done()
         await q.join()
 
     async def shutdown(self):
         if self.debug is True:
-            cPrint(f'Shutting down worker {self.name!s}')
+            cPrint(
+                f'Shutting down worker {self.name!s}'
+            )
         try:
             # forcing close the queue
             await self.empty_queue(self.queue)
@@ -216,14 +182,26 @@ class QWorker:
             pass
         # also: cancel the idle consumers:
         for c in self.consumers:
-            c.cancel()
+            try:
+                c.cancel()
+            except asyncio.CancelledError:
+                pass
         try:
             self._server.close()
             await self._server.wait_closed()
         except RuntimeError as err:
-            logging.exception(err, stack_info=True)
+            self.logger.exception(err, stack_info=True)
+        except Exception as exc:
+            raise QWException(
+                f"Error closing Worker: {exc}"
+            )
+        finally:
+            self._loop.stop()
         if self.debug is True:
-            cPrint('::: QueueWorker Server Closed ::: ', level='INFO')
+            cPrint(
+                '::: QueueWorker Server Closed ::: ',
+                level='INFO'
+            )
 
     def run_process(self, fn):
         """Unpickles task, runs it and pickles result."""
@@ -244,7 +222,9 @@ class QWorker:
 
     async def run_function(self, fn, event_loop: asyncio.AbstractEventLoop):
         result = None
-        print(f'Running Task {fn!s} in worker {self.name!s}')
+        self.logger.debug(
+            f'Running Task {fn!s} in worker {self.name!s}'
+        )
         try:
             asyncio.set_event_loop(event_loop)
             if isinstance(fn, FuncWrapper):
@@ -266,7 +246,9 @@ class QWorker:
             result = err
         finally:
             await task.close()
-        print(f'RUN TASK {task!s} RESULT> ', result)
+        self.logger.debug(
+            f"Running Task: {task!s}"
+        )
         return result
 
     async def task_handler(self, q: asyncio.Queue):
@@ -274,14 +256,22 @@ class QWorker:
         while True:
             task = await q.get()
             if self.debug:
-                cPrint(f'Running Queued Task {task!s}', level='DEBUG')
+                cPrint(
+                    f'Running Queued Task {task!s}', level='DEBUG'
+                )
             # processing the task received
             if isinstance(task, TaskWrapper):
-                # Running a DataIntegrator Task
+                # Running a FlowTask Task
                 task.set_loop(self._loop)
                 task.debug = self.debug
-                result = await self.run_task(task)
-                logging.debug(f'{task!s} Result: {result!r}')
+                fn = partial(self.run_process, task)
+                result = await self._loop.run_in_executor(
+                    self._executor, fn
+                )
+                # result = await self.run_task(task)
+                self.logger.debug(
+                    f'{task!s} Result: {result!r}'
+                )
             elif isinstance(task, FuncWrapper):
                 # running a FuncWrapper
                 result = None
@@ -289,13 +279,17 @@ class QWorker:
                     result = await self.run_function(task, self._loop)
                 except Exception as err:  # pylint: disable=W0703
                     result = err
-                logging.debug(f'{task!s} Result: {result!r}')
+                self.logger.debug(f'{task!s} Result: {result!r}')
             else:
                 # TODO: try to Execute the object deserialized
                 pass
             q.task_done()
-            logging.debug(f'consumed: {task}')
-            logging.debug(f'QUEUE Size after Work: {self.queue.qsize()}')
+            self.logger.debug(
+                f'consumed: {task}'
+            )
+            self.logger.debug(
+                f'QUEUE Size after Work: {self.queue.qsize()}'
+            )
 
     def check_signature(self, payload: bytes) -> bool:
         signature = make_signature(expected_message, WORKER_SECRET_KEY)
@@ -304,10 +298,13 @@ class QWorker:
         else:
             return False
 
-    async def response_keepalive(self, writer: asyncio.StreamWriter, status: dict = None) -> None:
+    async def response_keepalive(
+        self,
+        writer: asyncio.StreamWriter,
+        status: dict = None
+    ) -> None:
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
         prct_used = self.get_resource_usage()
-        ### logging.debug(f'{self.name}: {prct_used:.2f}%')
         if not status:
             status = {
                 "pong": "Empty data",
@@ -320,35 +317,102 @@ class QWorker:
         result = json_encoder(status)
         await self.closing_writer(writer, result.encode('utf-8'))
 
-    async def connection_handler(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """ Handler for Function/Task Execution.
+    async def worker_health(self, writer: asyncio.StreamWriter):
+        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        status = {
+            "queue": {
+                "size": self.queue.qsize(),
+                "full": self.queue.full(),
+                "empty": self.queue.empty(),
+                "consumers": len(self.consumers)
+            },
+            "worker": {
+                "name": self.name,
+                "address": self.server_address,
+                "serving": addrs
+            }
+        }
+        await self.response_keepalive(status=status, writer=writer)
 
-        receives the client request and run/queue the function..
+    async def worker_check_state(self, writer: asyncio.StreamWriter):
+        ## TODO: add last executed task
+        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        status = {
+            "versions": get_versions(),
+            "worker": {
+                "name": self.name,
+                "address": self.server_address,
+                "serving": addrs
+            },
+            "queue": {
+                "size": self.queue.qsize(),
+                "full": self.queue.full(),
+                "empty": self.queue.empty(),
+                "consumers": len(self.consumers)
+            },
+        }
+        await self.response_keepalive(
+            status=status,
+            writer=writer
+        )
 
-        Args:
-            reader: asyncio StreamReader, client information
-            writer: asyncio StreamWriter, infor to send to client.
-        Returns:
-            Task Result.
-        """
-        # # TODO: task can select which executor to use, else use default:
-        # print(f':: Starting Handler on worker {self.name!s} ::')
-        addr = writer.get_extra_info("peername")
-        # first time: check signature:
+    async def discard_task(self, message: str, writer: asyncio.StreamWriter):
+        exc = DiscardedTask(
+            message
+        )
+        result = cloudpickle.dumps(exc)
+        await self.closing_writer(
+            writer,
+            result
+        )
+        return False
+
+    async def signature_validation(
+            self,
+            reader: asyncio.StreamReader,
+            writer: asyncio.StreamWriter
+    ):
+        prefix = None
         try:
             prefix = await reader.readline()
             if not prefix:
                 # if no content on payload:
                 await self.response_keepalive(writer=writer)
                 return False
-            msglen = int(prefix)
+        except asyncio.IncompleteReadError as exc:
+            self.logger.error(exc)
+            return False
+        except (ConnectionResetError, ConnectionAbortedError, EOFError) as exc:
+            self.logger.error(exc)
+            raise
+        except asyncio.CancelledError:
+            return False
+        ###
+        if prefix == b'health':
+            ### sending a heartbeat
+            await self.worker_health(
+                writer=writer
+            )
+            return False
+        elif prefix == b'check_state':
+            await self.worker_check_state(
+                writer=writer
+            )
+            return False
+        else:
+            try:
+                msglen = int(prefix)
+            except ValueError:
+                raise
             payload = await reader.readexactly(msglen)
             if self.check_signature(payload) is False:
                 ### close transport inmediately:
                 exc = ConnectionRefusedError(
                     'Connection unsecured, Closing now.'
                 )
-                logging.error(f'Closing unsecured connection from {addr}')
+                self.logger.error(
+                    'Closing unsecured connection'
+                )
                 result = cloudpickle.dumps(exc)
                 await self.closing_writer(
                     writer,
@@ -357,10 +421,10 @@ class QWorker:
                 return False
             else:
                 prct_used = self.get_resource_usage()
-                logging.debug(f'Current NFILE percent: {prct_used}')
+                self.logger.debug(f'Current NFILE percent: {prct_used}')
                 if prct_used >= int(RESOURCE_THRESHOLD):
-                    logging.error(
-                        f'Discarted Task from {addr} due Resource usage: {prct_used}'
+                    self.logger.error(
+                        f'Discarted Task due Resource usage: {prct_used}'
                     )
                     exc = DiscardedTask(
                         f'Too many Open Files: {prct_used:.2f}% usage.'
@@ -374,147 +438,119 @@ class QWorker:
                 # passing a "continue" signal:
                 writer.write('CONTINUE'.encode('utf-8'))
                 await writer.drain()
-        except ValueError as err:
-            if prefix == b'health':
-                status = {
-                    "queue": {
-                        "size": self.queue.qsize(),
-                        "full": self.queue.full(),
-                        "empty": self.queue.empty(),
-                        "consumers": len(self.consumers)
-                    },
-                    "worker": {
-                        "name": self.name,
-                        "address": self.server_address
-                    }
-                }
-                await self.response_keepalive(status=status, writer=writer)
-            exc = ConfigError(
-                f"QW Server: invalid or empty Signature WORKER_SECRET_KEY, err: {err!s}"
-            )
-            result = cloudpickle.dumps(exc)
-            await self.closing_writer(writer, result)
-            return False
-        except Exception as err:  # pylint: disable=W0703
-            logging.exception(f'Error Decoding Signature: {err}', stack_info=True)
-        ## after: deserialize Task:
+                return True
+
+    async def _read_task(self, reader: asyncio.StreamReader):
         serialized_task = b''
         while True:
-            serialized_task = await reader.read(-1)
+            serialized_task += await reader.read(-1)
             if reader.at_eof():
                 break
-        result = None
-        task_uuid = uuid.uuid4()
-        logging.debug(
-            f"Received Data from {addr!r} into worker {self.name!s} pid: {self._pid}"
-        )
+        return serialized_task
+
+    async def deserialize_task(self, serialized_task, writer: asyncio.StreamWriter):
         try:
             task = cloudpickle.loads(serialized_task)
-            logging.debug(f'TASK RECEIVED: {task}')
+            self.logger.debug(f'TASK RECEIVED: {task}')
+            return task
         except RuntimeError as ex:
-            ex = ParserError(f"Error decoding serialized task: {ex}")
+            ex = ParserError(f"Error Decoding Serialized Task: {ex}")
             result = cloudpickle.dumps(ex)
             await self.closing_writer(writer, result)
             return False
-        except EOFError:
-            # send a pong
-            result = "Pong: Empty Data"
-            await self.closing_writer(writer, result.encode('utf-8'))
-            return True
-        except Exception as err:  # pylint: disable=W0703
-            exc = Exception(
-                f'No Valid Function was sent to Worker: {err}'
-            )
-            result = cloudpickle.dumps(exc)
-            await self.closing_writer(writer, result)
-            return False
-        # TODO: evaluate different kind of tasks
-        if not task or isinstance(task, str):
-            addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
-            if task == 'health':
-                # can return health of worker
-                status = {
-                    "queue": {
-                        "size": self.queue.qsize(),
-                        "full": self.queue.full(),
-                        "empty": self.queue.empty(),
-                        "consumers": len(self.consumers)
-                    },
-                    "worker": {
-                        "name": self.name,
-                        "address": self.server_address,
-                        "serving": addrs
-                    }
-                }
-                await self.response_keepalive(status=status, writer=writer)
-            elif task == 'check_state':
-                ## checking the current state of Worker:
-                ## TODO: add last executed task
-                status = {
-                    "versions": get_versions(),
-                    "worker": {
-                        "name": self.name,
-                        "address": self.server_address,
-                        "serving": addrs
-                    },
-                    "queue": {
-                        "size": self.queue.qsize(),
-                        "full": self.queue.full(),
-                        "empty": self.queue.empty(),
-                        "consumers": len(self.consumers)
-                    },
-                }
-                await self.response_keepalive(status=status, writer=writer)
-            else:
-                # its a simple keepalive:
-                await self.response_keepalive(writer=writer)
-            return True
-        elif isinstance(task, QueueWrapper):
-            # Set Debug level of task:
-            task.debug = self.debug
-            if task.queued is True:
+
+    async def handle_queue_wrapper(
+        self,
+        task: QueueWrapper,
+        uid: uuid.UUID,
+        writer: asyncio.StreamWriter
+    ):
+        """Handle QueueWrapper Tasks.
+        """
+        # Set Debug level of task:
+        task.debug = self.debug
+        if task.queued is True:
+            try:
+                task.id = uid
+                await self.queue.put(task)
+                self.logger.debug(
+                    f'Current QUEUE Size: {self.queue.qsize()}'
+                )
+                return f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
+            except asyncio.QueueFull:
+                return await self.discard_task(
+                    f"Worker {self.name!s} Queue is Full, discarding Task {task!r}"
+                )
+        else:
+            try:
+                # executed and send result to client
+                task.id = uid
+                fn = partial(self.run_process, task)
+                return await self._loop.run_in_executor(self._executor, fn)
+            except Exception as err:  # pylint: disable=W0703
                 try:
-                    task.id = task_uuid
-                    await self.queue.put(task)
-                    logging.debug(f'Current QUEUE Size: {self.queue.qsize()}')
-                    result = f'Task {task!s} with id {task_uuid} was queued.'.encode('utf-8')
-                except asyncio.QueueFull:
-                    logging.debug(
-                        f"Worker {self.name!s} Queue is Full, discarding Task {task!r}"
-                    )
-                    result = {
-                        "error": f"Worker {self.name!s} Queue is Full, discarding Task {task!r}"
-                    }
-                    # result = cloudpickle.dumps(result)
-                    await self.closing_writer(writer, result)
-                    return False
-            else:
-                try:
-                    # executed and send result to client
-                    task.id = task_uuid
-                    fn = partial(self.run_process, task)
-                    result = await self._loop.run_in_executor(self._executor, fn)
-                except Exception as err:  # pylint: disable=W0703
-                    try:
-                        result = cloudpickle.dumps(err)
-                    except Exception as ex:  # pylint: disable=W0703
-                        result = cloudpickle.dumps(
-                            Exception(f'Error on Worker: {ex!s}')
+                    result = cloudpickle.dumps(err)
+                except Exception as ex:  # pylint: disable=W0703
+                    result = cloudpickle.dumps(
+                        QWException(
+                            f'Error on Deal with Exception: {ex!s}'
                         )
-                    await self.closing_writer(writer, result)
-                    return False
+                    )
+                await self.closing_writer(writer, result)
+                return False
+
+    async def connection_handler(
+            self,
+            reader: asyncio.StreamReader,
+            writer: asyncio.StreamWriter
+    ):
+        """ Handler for Function/Task Execution.
+        receives the client request and run/queue the function.
+        Args:
+            reader: asyncio StreamReader, client information
+            writer: asyncio StreamWriter, infor to send to client.
+        Returns:
+            Task Result.
+        """
+        # # TODO: task can select which executor to use, else use default:
+        addr = writer.get_extra_info("peername")
+        # first time: check signature authentication of payload:
+        if not await self.signature_validation(reader, writer):
+            return False
+        self.logger.debug(
+            f"Received Data from {addr!r} to worker {self.name!s} pid: {self._pid}"
+        )
+        # after: deserialize Task:
+        serialized_task = await self._read_task(reader)
+        task = None
+        result = None
+        task_uuid = uuid.uuid4()
+        task = await self.deserialize_task(serialized_task, writer)
+        if not task:
+            return False
+        elif isinstance(task, QueueWrapper):
+            if not (result := await self.handle_queue_wrapper(task, task_uuid, writer)):
+                return False
         elif callable(task):
-            result = await self.run_function(task, self._loop)
+            result = await self.run_function(
+                task, self._loop
+            )
         else:
             # put work in Queue:
             try:
                 await self.queue.put(task)
                 await asyncio.sleep(.1)
-                logging.debug(f'Current QUEUE Size: {self.queue.qsize()}')
-                result = f'Task {task!s} with id {task_uuid} was queued.'.encode('utf-8')
+                self.logger.debug(
+                    f'Current QUEUE Size: {self.queue.qsize()}'
+                )
+                result = f'Task {task!s}:{task_uuid} was Queued.'.encode('utf-8')
             except asyncio.QueueFull:
-                logging.debug(
+                self.logger.error(
                     f"Worker Queue is Full, discarding Task {task!r}"
+                )
+                return await self.discard_task(
+                    message=f'Task {task!s} was discarded, queue full',
+                    writer=writer
                 )
         if result is None:
             # Not always a Task returns Value, sometimes returns None.
@@ -523,12 +559,14 @@ class QWorker:
             ]
         try:
             if isinstance(result, BaseException):
+                try:
+                    msg = result.message
+                except Exception:
+                    msg = str(result)
                 result = {
                     "exception": result,
-                    "error": result.message
+                    "error": msg
                 }
-                # sending Task Exception
-                # result = jsonpickle.encode(result)
             elif inspect.isgeneratorfunction(result) or isinstance(result, list):
                 try:
                     result = json_encoder(list(result))
@@ -541,16 +579,60 @@ class QWorker:
                 "error": str(err)
             }
             result = cloudpickle.dumps(error)
-            logging.error(f'Error dumping result: {err!s}')
+            self.logger.error(
+                f'Error dumping result: {err!s}'
+            )
         await self.closing_writer(writer, result)
-        return True
 
     async def closing_writer(self, writer: asyncio.StreamWriter, result):
         """Sending results and closing the streamer."""
-        writer.write(result)
-        await writer.drain()
-        if writer.can_write_eof():
-            writer.write_eof()
-        if self.debug is True:
-            cPrint(f"Closing client socket, pid: {self._pid}", level='DEBUG')
-        writer.close()
+        try:
+            writer.write(result)
+            await writer.drain()
+            if writer.can_write_eof():
+                writer.write_eof()
+            if self.debug is True:
+                cPrint(f"Closing client socket, pid: {self._pid}", level='DEBUG')
+            writer.close()
+        except Exception as e:
+            self.logger.error(f"Error while closing writer: {str(e)}")
+
+
+### Start Server ###
+def start_server(num_worker, host, port, debug: bool):
+    """thread worker function"""
+    loop = None
+    worker = None
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    except RuntimeError as ex:
+        raise QWException(
+            f"Unable to set an event loop: {ex}"
+        ) from ex
+    try:
+        worker = QWorker(
+            host=host,
+            port=port,
+            event_loop=loop,
+            debug=debug,
+            worker_id=num_worker
+        )
+        loop.run_until_complete(
+            worker.start()
+        )
+    except (OSError, RuntimeError) as ex:
+        raise QWException(
+            f"Unable to Spawn a new Worker: {ex}"
+        )
+    except KeyboardInterrupt:
+        if loop and worker:
+            worker.logger.info(
+                f'Shutting down Worker {worker.name if worker else "unknown"}'
+            )
+            loop.run_until_complete(
+                worker.shutdown()
+            )
+    finally:
+        if loop:
+            loop.close()  # Close the event loop

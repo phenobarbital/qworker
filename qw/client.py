@@ -78,7 +78,12 @@ class QClient:
     redis: Callable = None
 
     def __init__(self, worker_list: list = None, timeout: int = 5):
-        self._loop = asyncio.get_event_loop()
+        try:
+            self._loop = asyncio.get_event_loop()
+        except RuntimeError:
+            raise
+        ## logger:
+        self.logger = logging.getLogger('QW:Client')
         ## check if we use network discovery or redis list:
         if worker_list:
             self._workers = worker_list
@@ -88,16 +93,22 @@ class QClient:
                 # get worker list from discovery:
                 self._workers, self._worker_list = get_client_discovery()
             else:
-                # starting redis:
-                self.redis = aioredis.ConnectionPool.from_url(
+                try:
+                    # starting redis:
+                    self.redis = aioredis.ConnectionPool.from_url(
                         WORKER_REDIS,
                         decode_responses=True,
                         encoding='utf-8'
-                )
-                # getting the list from redis
-                self._workers, self._worker_list = self.get_workers()
+                    )
+                    # getting the list from redis
+                    self._workers, self._worker_list = self.get_workers()
+                except aioredis.ConnectionError as err:
+                    self.logger.error(
+                        f"Redis connection error: {err}"
+                    )
+                    raise
         if not self._worker_list:
-            logging.warning(
+            self.logger.warning(
                 'EMPTY WORKER LIST: Trying to connect to a default Worker'
             )
             # try to connect with the default worker
@@ -115,9 +126,8 @@ class QClient:
         async def get_workers_list():
             conn = aioredis.Redis(connection_pool=self.redis)
             workers = []
-            l = await conn.lrange(QW_WORKER_LIST, 0, 100)
-            if l:
-                w = [orjson.loads(el) for el in l]
+            if (lrange := await conn.lrange(QW_WORKER_LIST, 0, 100)):
+                w = [orjson.loads(el) for el in lrange]
                 workers = [tuple(list(v.values())[0]) for v in w]
             return workers, itertools.cycle(workers)
         return self._loop.run_until_complete(get_workers_list())
@@ -143,7 +153,6 @@ class QClient:
             if isinstance(response, BaseException):
                 raise response
 
-
     async def get_connection(self):
         retries = {}
         reader = None
@@ -153,7 +162,7 @@ class QClient:
             self.discover_workers()
         while True:
             worker = round_robin_worker(self._worker_list)
-            logging.debug(f':: WORKER SELECTED: {worker!r}')
+            self.logger.debug(f':: WORKER SELECTED: {worker!r}')
             if not worker:
                 raise ConnectionAbortedError(
                     "Error: There is no workers to work with."
@@ -171,7 +180,7 @@ class QClient:
                     reader, writer
                 )
             except DiscardedTask as exc:
-                logging.warning(
+                self.logger.warning(
                     f'Task was discarded, {exc!s}, retrying'
                 )
                 raise
@@ -215,10 +224,10 @@ class QClient:
         await writer.drain()
         try:
             if self.redis:
-                await self.redis.disconnect(inuse_connections = True)
+                await self.redis.disconnect(inuse_connections=True)
         except (AttributeError, ConnectionError) as err:
-            logging.error(err)
-        logging.debug('Closing Socket')
+            self.logger.error(err)
+        self.logger.debug('Closing Socket')
         writer.close()
 
     async def run(self, fn: Any, *args, use_wrapper: bool = False, **kwargs):
@@ -251,12 +260,12 @@ class QClient:
                 f"Unable to Connect to Queue Worker: {ex}"
             ) from ex
         except Exception as err:
-            logging.error(err)
+            self.logger.error(err)
             raise
 
         host, *_ = writer.get_extra_info('sockname')
         # wrapping the function into Task Wrapper
-        logging.debug(f'Sending Object {fn!s} to Worker {host}')
+        self.logger.debug(f'Sending Object {fn!s} to Worker {host}')
         if isinstance(fn, (TaskWrapper, FuncWrapper)):
             # already wrapped
             func = fn
@@ -281,7 +290,7 @@ class QClient:
                 writer.write_eof()
             await writer.drain()
         except Exception as err:
-            logging.error(f'Error Serializing Task: {err!s}')
+            self.logger.error(f'Error Serializing Task: {err!s}')
             raise
         # Then, got the result:
         serialized_result = None
@@ -298,7 +307,7 @@ class QClient:
             await self.close(writer)
         try:
             task_result = cloudpickle.loads(serialized_result)
-            logging.debug(
+            self.logger.debug(
                 f'Data Received: {task_result!r}'
             )
             try:
@@ -317,10 +326,10 @@ class QClient:
                 f"Error Parsing serialized results: {ex}"
             ) from ex
         except EOFError as err:
-            logging.exception(f'No data was received from Server: {err!s}')
+            self.logger.exception(f'No data was received from Server: {err!s}')
             task_result = None
-        except Exception as err: # pylint: disable=W0703
-            logging.exception(f'Error receiving data from Worker Server: {err!s}')
+        except Exception as err:  # pylint: disable=W0703
+            self.logger.exception(f'Error receiving data from Worker Server: {err!s}')
             task_result = None
         if isinstance(task_result, BaseException):
             # raise task_result
@@ -341,27 +350,11 @@ class QClient:
                 ex = task_result['exception']
                 if isinstance(ex, BaseException):
                     msg = task_result['error']
-                    ex.message = msg
-                    raise ex
+                    error = str(ex)
+                    raise ex(
+                        f"{error}: {msg}"
+                    )
             return task_result
-        # elif isinstance(task_result, str):
-        #     if newval:=is_parseable(task_result):
-        #         val = newval(task_result)
-        #         if isinstance(val, list):
-        #             new_val = []
-        #             for el in val:
-        #                 if nval:=is_parseable(el):
-        #                     new_val.append(nval(el))
-        #                 else:
-        #                     new_val.append(el)
-        #             val = new_val
-        #         return val
-        #     # try to de-serialize the result:
-        #     try:
-        #         return orjson.loads(task_result)
-        #     except Exception as err:
-        #         logging.error(err)
-        #         return task_result
         else:
             return task_result
 
@@ -391,9 +384,9 @@ class QClient:
             ### ask again after wait for new connection:
             reader, writer = await self.get_connection()
         except Exception as err:
-            logging.error(err)
+            self.logger.error(err)
             raise
-        logging.debug(f'Sending function {fn!s} to Worker')
+        self.logger.debug(f'Sending function {fn!s} to Worker')
         host, *_ = writer.get_extra_info('sockname')
         if isinstance(fn, (FuncWrapper, TaskWrapper)):
             # Function was wrapped or is already wrapped
@@ -434,7 +427,7 @@ class QClient:
                 "message": received
             }
             return serialized_result
-        except Exception as err: # pylint: disable=W0703
-            logging.exception(
+        except Exception as err:  # pylint: disable=W0703
+            self.logger.exception(
                 f'Error Serializing Task: {err!s}'
             )

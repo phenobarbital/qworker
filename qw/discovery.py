@@ -17,12 +17,15 @@ from .protocols import DiscoveryProtocol
 async def get_server_discovery(event_loop: asyncio.AbstractEventLoop) -> Any:
     """Get Server Discovery.
     """
-    return await event_loop.create_datagram_endpoint(
-        DiscoveryProtocol,
-        local_addr=('0.0.0.0', WORKER_DISCOVERY_PORT),
-        family=socket.AF_INET,
-        allow_broadcast=True
-    )
+    try:
+        return await event_loop.create_datagram_endpoint(
+            DiscoveryProtocol,
+            local_addr=('0.0.0.0', WORKER_DISCOVERY_PORT),
+            family=socket.AF_INET,
+            allow_broadcast=True
+        )
+    except OSError:
+        return False
 
 
 def get_client_discovery() -> tuple:

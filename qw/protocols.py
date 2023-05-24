@@ -80,16 +80,21 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
     def remove_worker(self, server: str):
         del self.workers[server]
 
-class QueueServer(asyncio.Protocol):
+class QueueProtocol(asyncio.Protocol):
     """Connection Protocol for QueueWorker Server."""
-    connections = {}
 
-    def __init__(self):
-        self.logger = logging.getLogger('qworker.protocol')
+    def __init__(self, queue: asyncio.Queue, name: str):
+        self.queue = queue
+        self.logger = logging.getLogger(
+            f'QW:QueueServer-{name}'
+        )
         self.transport = None
         self.loop = asyncio.get_event_loop()
         self._ready = asyncio.Event()
-        print('Starting Protocol ... ')
+        self._name = name
+        print(
+            f'Starting Protocol for {name}'
+        )
 
     def setup(self, peer):
         self.ip, self.port = peer[0], peer[1]
@@ -104,11 +109,11 @@ class QueueServer(asyncio.Protocol):
         return self._connection_id
 
     def connection_lost(self, exc):
-        print('Connection Lost')
         if exc:
             self.logger.exception(exc)
-        self.logger.debug('Server closed the connection')
-        del QueueServer.connections[self.connection_id]
+        self.logger.debug(
+            'Server closed the Connection'
+        )
         super().connection_lost(exc=exc)
 
     def connection_made(self, transport):
@@ -119,13 +124,9 @@ class QueueServer(asyncio.Protocol):
         print('Connection Accepted')
 
     def data_received(self, data):
-        print('Data Received')
-        print('Data received: {!r}', len(data))
-        self.logger.debug('received {!r}'.format(data))
-        self.transport.write(data)
-        self.logger.debug('sent {!r}'.format(data))
+        pass
 
-    def eof_received(self):
-        self.logger.debug('received EOF')
-        if self.transport.can_write_eof():
-            self.transport.write_eof()
+    # def eof_received(self):
+    #     self.logger.debug('received EOF')
+    #     if self.transport.can_write_eof():
+    #         self.transport.write_eof()

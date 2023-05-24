@@ -2,6 +2,7 @@
 import asyncio
 import argparse
 import uvloop
+import warnings
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -14,9 +15,13 @@ from .process import SpawnProcess
 from .utils import cPrint
 
 
+warnings.simplefilter("default", ResourceWarning)
+
 def main():
     """Main Worker Function."""
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    asyncio.set_event_loop_policy(
+        uvloop.EventLoopPolicy()
+    )
     uvloop.install()
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter
@@ -47,6 +52,13 @@ def main():
         help='Worker Name'
     )
     parser.add_argument(
+        '--enable-discovery', dest='enable_discovery',
+        type=str.lower,
+        choices=["true", "false"],
+        default='true',
+        help='Start Discovery Service on this Worker'
+    )
+    parser.add_argument(
         '--discovery', dest='discovery', type=str,
         default=WORKER_DISCOVERY_PORT,
         help='UDP Port for Service discovery'
@@ -60,14 +72,18 @@ def main():
     try:
         loop = asyncio.get_event_loop()
         cPrint('::: Starting Workers ::: ')
-        process = SpawnProcess(args, event_loop=loop)
+        process = SpawnProcess(args)
         process.start()
         loop.run_forever()
     except KeyboardInterrupt:
         process.terminate()
+    except Exception as ex:
+        # log the unexpected error
+        print(f"Unexpected error: {ex}")
+        process.terminate()
     finally:
         cPrint('Shutdown all workers ...', level='WARN')
-        loop.stop()  # Stop the event loop
+        loop.close()  # close the event loop
 
 
 if __name__ == '__main__':

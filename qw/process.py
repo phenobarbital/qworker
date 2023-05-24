@@ -48,8 +48,11 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
 
 
 class SpawnProcess(object):
-    def __init__(self, args, event_loop):
-        self.loop: asyncio.AbstractEventLoop = event_loop
+    def __init__(self, args):
+        try:
+            self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+        except RuntimeError:
+            raise
         self.host: str = args.host
         self.address = socket.gethostbyname(socket.gethostname())
         self.id = str(uuid.uuid1())
@@ -57,6 +60,9 @@ class SpawnProcess(object):
         self.worker: str = f"{args.wkname}-{args.port}"
         self.debug: bool = args.debug
         self.redis: Callable = None
+        self.enable_discovery: bool = True
+        if args.enable_discovery == 'false':
+            self.enable_discovery: bool = False
         self.discovery_server: Callable = None
         self.transport: asyncio.Transport = None
         # increase the ulimit of server
@@ -164,10 +170,11 @@ class SpawnProcess(object):
             )
             raise
         try:
-            self.transport, self.discovery_server = self.loop.run_until_complete(
-                get_server_discovery(event_loop=self.loop)
-            )
-            cPrint(':: Starting Discovery Server ::', level='WARN')
+            if self.enable_discovery is True:
+                self.transport, self.discovery_server = self.loop.run_until_complete(
+                    get_server_discovery(event_loop=self.loop)
+                )
+                cPrint(':: Starting Discovery Server ::', level='WARN')
         except asyncio.TimeoutError as err:
             self.logger.error(
                 f"Timeout error when starting Discovery Server: {err}"
@@ -202,8 +209,15 @@ class SpawnProcess(object):
             self.loop.run_until_complete(
                 self.stop_redis()
             )
-            if self.transport:
-                self.transport.close()
+            for j in JOB_LIST:
+                try:
+                    j.terminate()
+                except (OSError, AssertionError) as ex:
+                    self.logger.exception(ex)
+                try:
+                    j.join()
+                except TypeError as ex:
+                    self.logger.exception(ex)
         except asyncio.TimeoutError as ex:
             self.logger.warning(
                 f"Timeout error: {ex}"
@@ -213,12 +227,6 @@ class SpawnProcess(object):
         except Exception as err:  # pylint: disable=W0703
             self.logger.exception(err)
             raise
-        for j in JOB_LIST:
-            try:
-                j.terminate()
-            except (OSError, AssertionError) as ex:
-                self.logger.exception(ex)
-            try:
-                j.join()
-            except TypeError as ex:
-                self.logger.exception(ex)
+        finally:
+            if self.enable_discovery is True:
+                self.transport.close()

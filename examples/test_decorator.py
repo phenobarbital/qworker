@@ -4,10 +4,10 @@ from notify.models import Actor
 from notify import Notify
 from qw.decorators import dispatch
 
-stmp_host_user=config.get('stmp_host_user')
-stmp_host_password=config.get('stmp_host_password')
-stmp_host=config.get('stmp_host')
-stmp_port=config.get('stmp_port')
+stmp_host_user = config.get('stmp_host_user')
+stmp_host_password = config.get('stmp_host_password')
+stmp_host = config.get('stmp_host')
+stmp_port = config.get('stmp_port')
 
 @dispatch
 async def send_email(sender):
@@ -29,7 +29,7 @@ async def send_email(sender):
 
 async def create_user():
     user = {
-    "name": "Jesus Lara",
+        "name": "Jesus Lara",
         "account": {
             "address": "jesuslarag@gmail.com",
         }
@@ -47,4 +47,4 @@ if __name__ == '__main__':
             create_user()
         )
     finally:
-        loop.stop()
+        loop.close()

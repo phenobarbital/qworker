@@ -16,7 +16,7 @@ async def very_long_task(seconds: int):
 async def queue_tasks():
     """Returns top n words in documents specified by URLs."""
     x = [randint(10, 20) for p in range(0, 100)]
-
+    print(f'Pushed {len(x)} tasks to worker queue.')
     result = await asyncio.gather(
         *[qw.queue(very_long_task, n) for n in x]
     )
