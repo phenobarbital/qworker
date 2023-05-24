@@ -4,10 +4,10 @@ from notify.models import Actor
 from notify import Notify
 from qw.client import QClient
 
-stmp_host_user=config.get('stmp_host_user')
-stmp_host_password=config.get('stmp_host_password')
-stmp_host=config.get('stmp_host')
-stmp_port=config.get('stmp_port')
+stmp_host_user = config.get('stmp_host_user')
+stmp_host_password = config.get('stmp_host_password')
+stmp_host = config.get('stmp_host')
+stmp_port = config.get('stmp_port')
 
 user = {
     "name": "Jesus Lara",
@@ -45,4 +45,4 @@ if __name__ == '__main__':
             qw.queue(send_email)
         )
     finally:
-        loop.stop()
+        loop.close()

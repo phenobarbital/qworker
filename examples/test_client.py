@@ -25,7 +25,7 @@ URLS = {
 
 def top_words(url, n):
     """Returns top n words from text specified by url."""
-    text = requests.get(url, timeout=10).text.split()
+    text = requests.get(url, timeout=5).text.split()
     return {url: Counter(text).most_common(n)}
 
 async def get_top_words(urls, n):
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     start_time = time.time()
     loop = asyncio.get_event_loop()
     top = loop.run_until_complete(
-        get_top_words(URLS, 20)
+        get_top_words(URLS, 50)
     )
     end_time = time.time() - start_time
     print(top)

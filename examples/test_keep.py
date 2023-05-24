@@ -3,8 +3,6 @@ Checking Health of Worker.
 """
 import asyncio
 import warnings
-import time
-import random
 import cloudpickle
 from navconfig.logging import logging
 # from qw.wrappers import FuncWrapper, TaskWrapper

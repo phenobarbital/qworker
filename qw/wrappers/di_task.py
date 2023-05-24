@@ -85,14 +85,14 @@ class TaskWrapper(QueueWrapper):
             result = await self.run()
             try:
                 stats = self._task.stats.stats
-            except Exception: # pylint: disable=W0703
+            except Exception:  # pylint: disable=W0703
                 stats = None
             result = {
                 "result": result,
                 "stats": stats
             }
             return result
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             return TaskFailed(str(err))
         finally:
             await self.close()
@@ -126,7 +126,7 @@ class TaskWrapper(QueueWrapper):
             if self._task:
                 await self._task.close()
                 self._task = None
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             logging.error(err)
 
     def __str__(self):
