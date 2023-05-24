@@ -41,13 +41,13 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
         try:
             ulimit = 'ulimit -{type} {value};'
             subprocess.Popen(ulimit.format(type='n', value=hard), shell=True)
-        except Exception as e: # pylint: disable=W0703
+        except Exception as e:  # pylint: disable=W0703
             print('Failed to set ulimit, giving up')
             logging.exception(e, stack_info=False)
     return 'nofile', (soft, hard)
 
 
-class spawn_process(object):
+class SpawnProcess(object):
     def __init__(self, args, event_loop):
         self.loop: asyncio.AbstractEventLoop = event_loop
         self.host: str = args.host
@@ -61,26 +61,36 @@ class spawn_process(object):
         self.transport: asyncio.Transport = None
         # increase the ulimit of server
         raise_nofile(value=NOFILES)
+        ## Logger:
+        self.logger = logging.getLogger(
+            name='QW:WorkerProcess'
+        )
         for i in range(args.workers):
-            p = mp.Process(
-                target=start_server,
-                name=f'{self.worker}_{i}',
-                args=(i, args.host, args.port, args.debug, )
-            )
-            JOB_LIST.append(p)
-            p.start()
-
+            try:
+                p = mp.Process(
+                    target=start_server,
+                    name=f'{self.worker}_{i}',
+                    args=(i, args.host, args.port, args.debug, )
+                )
+                JOB_LIST.append(p)
+                p.start()
+            except (OSError, IOError) as ex:
+                self.logger.error(
+                    f"Error Dispatching Worker: {ex}"
+                )
+                raise
 
     async def start_redis(self):
         # starting redis:
         try:
             self.redis = aioredis.ConnectionPool.from_url(
-                    WORKER_REDIS,
-                    decode_responses=True,
-                    encoding='utf-8'
+                WORKER_REDIS,
+                decode_responses=True,
+                encoding='utf-8'
             )
-        except Exception as e:
-            raise Exception(e) from e
+        except Exception as ex:
+            self.logger.exception(ex)
+            raise
 
     async def stop_redis(self):
         try:
@@ -88,19 +98,25 @@ class spawn_process(object):
             await conn.delete(
                 QW_WORKER_LIST
             )
-            await self.redis.disconnect(inuse_connections = True)
-        except Exception as err: # pylint: disable=W0703
-            logging.exception(err)
+            await self.redis.disconnect(inuse_connections=True)
+        except Exception as err:  # pylint: disable=W0703
+            self.logger.exception(err)
 
     async def register_worker(self):
-        worker = json_encoder({
-            self.id: (self.address, self.port)
-        })
-        conn = aioredis.Redis(connection_pool=self.redis)
-        await conn.lpush(
-            QW_WORKER_LIST,
-            worker
-        )
+        try:
+            worker = json_encoder({
+                self.id: (self.address, self.port)
+            })
+            conn = aioredis.Redis(connection_pool=self.redis)
+            await conn.lpush(
+                QW_WORKER_LIST,
+                worker
+            )
+        except aioredis.ConnectionError as err:
+            self.logger.error(
+                f"Redis connection error: {err}"
+            )
+            raise
         if self.discovery_server:
             self.discovery_server.register_worker(
                 server=self.id, addr=(self.address, self.port)
@@ -137,19 +153,46 @@ class spawn_process(object):
             self.loop.run_until_complete(
                 self.start_redis()
             )
-            try:
-                self.transport, self.discovery_server = self.loop.run_until_complete(
-                    get_server_discovery(event_loop=self.loop)
-                )
-                cPrint(':: Starting Discovery Server ::', level='WARN')
-            except Exception:
-                pass
+        except aioredis.ConnectionError as err:
+            self.logger.error(
+                f"Redis connection error: {err}"
+            )
+            raise
+        except Exception as err:
+            self.logger.error(
+                f"Unexpected error when starting Redis: {err}"
+            )
+            raise
+        try:
+            self.transport, self.discovery_server = self.loop.run_until_complete(
+                get_server_discovery(event_loop=self.loop)
+            )
+            cPrint(':: Starting Discovery Server ::', level='WARN')
+        except asyncio.TimeoutError as err:
+            self.logger.error(
+                f"Timeout error when starting Discovery Server: {err}"
+            )
+            raise
+        except Exception as err:
+            self.logger.error(
+                f"Unexpected error when starting Discovery Server: {err}"
+            )
+            raise
+        try:
             # register worker in the worker list
             self.loop.run_until_complete(
                 self.register_worker()
             )
-        except Exception as err: # pylint: disable=W0703
-            logging.error(err)
+        except asyncio.TimeoutError as err:
+            self.logger.error(
+                f"Timeout error when registering worker: {err}"
+            )
+            raise
+        except Exception as err:
+            self.logger.error(
+                f"Unexpected error when registering worker: {err}"
+            )
+            raise
 
     def terminate(self):
         try:
@@ -161,8 +204,21 @@ class spawn_process(object):
             )
             if self.transport:
                 self.transport.close()
-        except Exception as err: # pylint: disable=W0703
-            logging.exception(err)
+        except asyncio.TimeoutError as ex:
+            self.logger.warning(
+                f"Timeout error: {ex}"
+            )
+        except asyncio.CancelledError as exc:
+            self.logger.warning(str(exc))
+        except Exception as err:  # pylint: disable=W0703
+            self.logger.exception(err)
+            raise
         for j in JOB_LIST:
-            j.terminate()
-            j.join()
+            try:
+                j.terminate()
+            except (OSError, AssertionError) as ex:
+                self.logger.exception(ex)
+            try:
+                j.join()
+            except TypeError as ex:
+                self.logger.exception(ex)

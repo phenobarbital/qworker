@@ -1,18 +1,18 @@
 """QueueWorker Server Implementation"""
-import asyncio
-import inspect
-import multiprocessing as mp
-from collections.abc import Callable
 import os
 import queue
 import socket
 import uuid
+import asyncio
+import inspect
+from typing import Any
+from collections.abc import Callable
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import partial
 import resource
 import psutil
 import cloudpickle
-import uvloop
 from navconfig.logging import logging
 from qw.exceptions import (
     QWException,
@@ -36,10 +36,6 @@ from .utils.versions import get_versions
 from .utils import cPrint
 from .wrappers import QueueWrapper, FuncWrapper, TaskWrapper
 
-asyncio.set_event_loop_policy(
-    uvloop.EventLoopPolicy()
-)
-uvloop.install()
 
 DEFAULT_HOST = WORKER_DEFAULT_HOST
 if not DEFAULT_HOST:
@@ -48,26 +44,41 @@ if not DEFAULT_HOST:
 
 def start_server(num_worker, host, port, debug: bool):
     """thread worker function"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    worker = QWorker(
-        host=host,
-        port=port,
-        event_loop=loop,
-        debug=debug,
-        worker_id=num_worker
-    )
+    loop = None
+    worker = None
     try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    except RuntimeError:
+        raise QWException(
+            f"Unable to set an event loop: {ex}"
+        )
+    try:
+        worker = QWorker(
+            host=host,
+            port=port,
+            event_loop=loop,
+            debug=debug,
+            worker_id=num_worker
+        )
         loop.run_until_complete(
             worker.start()
         )
-    except KeyboardInterrupt:
-        print(f'Shutdown Worker {worker.name}')
-        loop.run_until_complete(
-            worker.shutdown()
+    except (OSError, RuntimeError) as ex:
+        raise QWException(
+            f"Unable to Spawn a new Worker: {ex}"
         )
+    except KeyboardInterrupt:
+        if loop and worker:
+            worker.logger.info(
+                f'Shutting down Worker {worker.name if worker else "unknown"}'
+            )
+            loop.run_until_complete(
+                worker.shutdown()
+            )
     finally:
-        loop.close()
+        if loop:
+            loop.close()  # Close the event loop
 
 
 class QWorker:
@@ -87,7 +98,7 @@ class QWorker:
             name: str = '',
             event_loop: asyncio.AbstractEventLoop = None,
             debug: bool = False,
-            protocol = None
+            protocol: Any = None
     ):
         self.host = host
         self.port = port
@@ -242,7 +253,7 @@ class QWorker:
                 result = await fn()
             else:
                 result = fn()
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             result = err
         return result
 
@@ -251,7 +262,7 @@ class QWorker:
         try:
             await task.create()
             result = await task.run()
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             result = err
         finally:
             await task.close()
@@ -276,7 +287,7 @@ class QWorker:
                 result = None
                 try:
                     result = await self.run_function(task, self._loop)
-                except Exception as err: # pylint: disable=W0703
+                except Exception as err:  # pylint: disable=W0703
                     result = err
                 logging.debug(f'{task!s} Result: {result!r}')
             else:
@@ -286,14 +297,12 @@ class QWorker:
             logging.debug(f'consumed: {task}')
             logging.debug(f'QUEUE Size after Work: {self.queue.qsize()}')
 
-
     def check_signature(self, payload: bytes) -> bool:
         signature = make_signature(expected_message, WORKER_SECRET_KEY)
         if signature == payload:
             return True
         else:
             return False
-
 
     async def response_keepalive(self, writer: asyncio.StreamWriter, status: dict = None) -> None:
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
@@ -386,7 +395,7 @@ class QWorker:
             result = cloudpickle.dumps(exc)
             await self.closing_writer(writer, result)
             return False
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             logging.exception(f'Error Decoding Signature: {err}', stack_info=True)
         ## after: deserialize Task:
         serialized_task = b''
@@ -412,7 +421,7 @@ class QWorker:
             result = "Pong: Empty Data"
             await self.closing_writer(writer, result.encode('utf-8'))
             return True
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             exc = Exception(
                 f'No Valid Function was sent to Worker: {err}'
             )
@@ -457,7 +466,7 @@ class QWorker:
                 }
                 await self.response_keepalive(status=status, writer=writer)
             else:
-            # its a simple keepalive:
+                # its a simple keepalive:
                 await self.response_keepalive(writer=writer)
             return True
         elif isinstance(task, QueueWrapper):
@@ -485,10 +494,10 @@ class QWorker:
                     task.id = task_uuid
                     fn = partial(self.run_process, task)
                     result = await self._loop.run_in_executor(self._executor, fn)
-                except Exception as err: # pylint: disable=W0703
+                except Exception as err:  # pylint: disable=W0703
                     try:
                         result = cloudpickle.dumps(err)
-                    except Exception as ex: # pylint: disable=W0703
+                    except Exception as ex:  # pylint: disable=W0703
                         result = cloudpickle.dumps(
                             Exception(f'Error on Worker: {ex!s}')
                         )
@@ -524,9 +533,9 @@ class QWorker:
                 try:
                     result = json_encoder(list(result))
                 except (ValueError, TypeError):
-                    result = f"{result!r}" # cannot pickle a generator object
+                    result = f"{result!r}"  # cannot pickle a generator object
             result = cloudpickle.dumps(result)
-        except Exception as err: # pylint: disable=W0703
+        except Exception as err:  # pylint: disable=W0703
             error = {
                 "exception": err,
                 "error": str(err)

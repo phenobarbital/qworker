@@ -4,7 +4,7 @@ def get_worker_list(workers: list):
     """Convert a list of workers in a tuple of worker:port for Scheduler."""
     wl = []
     for worker in workers:
-        w,p = worker.split(':')
+        w, p = worker.split(':')
         wl.append((w, p))
     return wl
 
@@ -24,6 +24,9 @@ USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=True)
 WORKER_DISCOVERY_HOST = config.get('WORKER_DISCOVERY_HOST')
 WORKER_DISCOVERY_PORT = config.getint('WORKER_DISCOVERY_PORT', fallback=8434)
 WORKER_DISCOVERY_BROADCAST = config.get('WORKER_DISCOVERY_BROADCAST', '255.255.255.255')
+WORKER_DEFAULT_MULTICAST = config.get(
+    'WORKER_DEFAULT_MULTICAST', fallback="239.255.255.250"
+)
 ## Word used by Discovery
 expected_message = config.get('WORKER_DISCOVERY_MESSAGE')
 WORKER_SECRET_KEY = config.get('WORKER_SECRET_KEY')
@@ -45,9 +48,19 @@ WORKER_HIGH_LIST = get_worker_list(HIGH_LIST)
 # upgrade no-files
 NOFILES = config.getint('ULIMIT_NOFILES', fallback=16384)
 
-PACKAGE_LIST = config.getlist('PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig'))
+PACKAGE_LIST = config.getlist(
+    'PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig')
+)
 
 try:
-    from settings.settings import WORKER_LIST, WORKER_HIGH_LIST, WORKER_REDIS, WORKER_DEFAULT_HOST, WORKER_DEFAULT_PORT, PACKAGE_LIST # pylint: disable=W0611
+    from settings.settings import (
+        WORKER_LIST,
+        WORKER_HIGH_LIST,
+        WORKER_REDIS,
+        WORKER_DEFAULT_MULTICAST,
+        WORKER_DEFAULT_HOST,
+        WORKER_DEFAULT_PORT,
+        PACKAGE_LIST
+    )  # pylint: disable=W0611
 except ImportError:
     pass
