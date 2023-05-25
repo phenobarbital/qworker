@@ -263,7 +263,7 @@ class QWorker:
             if isinstance(task, TaskWrapper):
                 # Running a FlowTask Task
                 task.set_loop(self._loop)
-                task.debug = self.debug
+                task.debug = True
                 fn = partial(self.run_process, task)
                 result = await self._loop.run_in_executor(
                     self._executor, fn
