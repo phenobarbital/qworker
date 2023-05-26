@@ -8,6 +8,7 @@ from collections.abc import Callable
 from collections import defaultdict
 from functools import partial
 import aioredis
+import pickle
 import cloudpickle
 import jsonpickle
 import orjson
@@ -149,9 +150,14 @@ class QClient:
         if response == b'CONTINUE':
             return [reader, writer]
         else:
-            response = cloudpickle.loads(response)
-            if isinstance(response, BaseException):
-                raise response
+            try:
+                response = cloudpickle.loads(response)
+                if isinstance(response, BaseException):
+                    raise response
+            except (TypeError, ValueError, pickle.UnpicklingError) as ex:
+                raise ConnectionRefusedError(
+                    f"Connection refused by QW Server: {ex}"
+                )
 
     async def get_connection(self):
         retries = {}
