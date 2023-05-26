@@ -20,7 +20,8 @@ URLS = {
     "http://www.andy-pearce.com/blog/posts/2016/Jul/the-state-of-python-coroutines-asyncio-callbacks-vs-coroutines/",
     "https://www.codespeedy.com/itertools-cycle-in-python/",
     "https://codereview.stackexchange.com/questions/156729/python-list-dictionary-items-round-robin-mixing",
-    "https://www.programcreek.com/python/?code=goldmansachs%2Fgs-quant%2Fgs-quant-master%2Fgs_quant%2Fapi%2Frisk.py"
+    "https://www.programcreek.com/python/?code=goldmansachs%2Fgs-quant%2Fgs-quant-master%2Fgs_quant%2Fapi%2Frisk.py",
+    "https://dle.rae.es/"
 }
 
 def top_words(url, n):
