@@ -55,7 +55,7 @@ class SpawnProcess(object):
             raise
         self.host: str = args.host
         self.address = socket.gethostbyname(socket.gethostname())
-        self.id = str(uuid.uuid1())
+        self.id = str(uuid.uuid4())
         self.port: int = args.port
         self.worker: str = f"{args.wkname}-{args.port}"
         self.debug: bool = args.debug
