@@ -2,7 +2,7 @@
 import asyncio
 import argparse
 import uvloop
-import warnings
+# import warnings
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -15,7 +15,7 @@ from .process import SpawnProcess
 from .utils import cPrint
 
 
-warnings.simplefilter("default", ResourceWarning)
+# warnings.simplefilter("default", ResourceWarning)
 
 def main():
     """Main Worker Function."""

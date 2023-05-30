@@ -372,22 +372,6 @@ class QWorker:
             writer: asyncio.StreamWriter
     ):
         prefix = None
-        prct_used = self.get_resource_usage()
-        self.logger.debug(f'Current NFILE percent: {prct_used}')
-        if prct_used >= int(RESOURCE_THRESHOLD):
-            ## Avoid accepting task for lack of resource
-            self.logger.error(
-                f'Discarted Task due Resource usage: {prct_used}'
-            )
-            exc = DiscardedTask(
-                f'Too many Open Files: {prct_used:.2f}% usage.'
-            )
-            result = cloudpickle.dumps(exc)
-            await self.closing_writer(
-                writer,
-                result
-            )
-            return False
         try:
             prefix = await reader.readline()
             if not prefix:
