@@ -46,7 +46,7 @@ HIGH_LIST = [e.strip() for e in list(config.get(
 WORKER_HIGH_LIST = get_worker_list(HIGH_LIST)
 
 # upgrade no-files
-NOFILES = config.getint('ULIMIT_NOFILES', fallback=16384)
+NOFILES = config.getint('ULIMIT_NOFILES', fallback=65535)
 
 PACKAGE_LIST = config.getlist(
     'PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig')

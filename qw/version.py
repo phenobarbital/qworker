@@ -12,6 +12,6 @@ __author_email__ = 'jesuslarag@gmail.com'
 __license__ = 'MIT'
 
 def get_version() -> tuple:  # pragma: no cover
-    """ Get nav-auth version as tuple.
+    """ Get Queue Worker version as tuple.
     """
     return tuple(x for x in __version__.split('.'))  # pragma: no cover
