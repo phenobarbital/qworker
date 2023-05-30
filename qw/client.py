@@ -357,6 +357,9 @@ class QClient:
                 if isinstance(ex, BaseException):
                     msg = task_result['error']
                     error = str(ex)
+                    self.logger.error(
+                        error
+                    )
                     raise ex(
                         f"{error}: {msg}"
                     )
