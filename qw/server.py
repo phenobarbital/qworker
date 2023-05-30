@@ -16,11 +16,10 @@ from navconfig.logging import logging
 from qw.exceptions import (
     QWException,
     ParserError,
-    ConfigError,
     DiscardedTask
 )
 from qw.utils import make_signature
-from .protocols import QueueProtocol
+# from .protocols import QueueProtocol
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -565,7 +564,7 @@ class QWorker:
                 except Exception:
                     msg = str(result)
                 result = {
-                    "exception": result,
+                    "exception": result.__class__,
                     "error": msg
                 }
             elif inspect.isgeneratorfunction(result) or isinstance(result, list):
@@ -576,7 +575,7 @@ class QWorker:
             result = cloudpickle.dumps(result)
         except Exception as err:  # pylint: disable=W0703
             error = {
-                "exception": err,
+                "exception": err.__class__,
                 "error": str(err)
             }
             result = cloudpickle.dumps(error)
