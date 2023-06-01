@@ -109,9 +109,13 @@ class TaskWrapper(QueueWrapper):
                         f'Error on Task: {self.program}.{self.task}'
                     )
             except Exception as err:
-                logging.error(err)
-                raise TaskFailed(f"{err}") from err
-            print(f'Executing Task {self.program}.{self.task}')
+                logging.error(str(err), exc_info=True)
+                raise TaskFailed(
+                    f"{err}"
+                ) from err
+            print(
+                f'Executing Task {self.program}.{self.task}'
+            )
             try:
                 result = await task.run()
             except Exception as err:

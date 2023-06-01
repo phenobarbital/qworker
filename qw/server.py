@@ -202,30 +202,28 @@ class QWorker:
                 level='INFO'
             )
 
-    def run_process(self, fn):
+    def run_process(self, fn, loop):
         """Unpickles task, runs it and pickles result."""
-        loop = asyncio.new_event_loop()
+        # loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         fn.set_loop(loop)
         try:
             result = loop.run_until_complete(
                 self.run_function(fn, loop)
             )
+            print("run_process completed normally")
             return result
         except Exception as err:
             raise QWException(
                 f"Error: {err}"
             ) from err
-        finally:
-            loop.close()
 
-    async def run_function(self, fn, event_loop: asyncio.AbstractEventLoop):
+    async def run_function(self, fn):
         result = None
-        self.logger.debug(
+        self.logger.notice(
             f'Running Task {fn!s} in worker {self.name!s}'
         )
         try:
-            asyncio.set_event_loop(event_loop)
             if isinstance(fn, FuncWrapper):
                 result = await fn()
             elif inspect.isawaitable(fn) or asyncio.iscoroutinefunction(fn):
@@ -233,11 +231,16 @@ class QWorker:
             else:
                 result = fn()
         except Exception as err:  # pylint: disable=W0703
+            print(err)
             result = err
-        return result
+        finally:
+            return result
 
     async def run_task(self, task: TaskWrapper):
         result = None
+        self.logger.debug(
+            f"Running Task: {task!s}"
+        )
         try:
             await task.create()
             result = await task.run()
@@ -245,9 +248,6 @@ class QWorker:
             result = err
         finally:
             await task.close()
-        self.logger.debug(
-            f"Running Task: {task!s}"
-        )
         return result
 
     async def task_handler(self, q: asyncio.Queue):
@@ -258,24 +258,37 @@ class QWorker:
                 cPrint(
                     f'Running Queued Task {task!s}', level='DEBUG'
                 )
+            # try:
+            #    loop = asyncio.new_event_loop()
+            # except RuntimeError:
+            loop = asyncio.get_running_loop()
             # processing the task received
             if isinstance(task, TaskWrapper):
                 # Running a FlowTask Task
-                task.set_loop(self._loop)
+                task.set_loop(loop)
                 task.debug = True
-                fn = partial(self.run_process, task)
-                result = await self._loop.run_in_executor(
-                    self._executor, fn
-                )
-                # result = await self.run_task(task)
                 self.logger.debug(
-                    f'{task!s} Result: {result!r}'
+                    f'Running Queued Task: {task!s}'
                 )
+                try:
+                    # fn = partial(self.run_function, task)
+                    fn = loop.create_task(self.run_task(task))
+                    result = await fn
+                    # with ThreadPoolExecutor(max_workers=2) as pool:
+                    #     future = loop.run_in_executor(pool, fn)
+                    #     result = await future
+                    print(f'RESULT > {result}')
+                except (RuntimeError) as err:
+                    raise QWException(
+                        f"Error: {err}"
+                    ) from err
+                except Exception as err:
+                    print(err)
             elif isinstance(task, FuncWrapper):
                 # running a FuncWrapper
                 result = None
                 try:
-                    result = await self.run_function(task, self._loop)
+                    result = await self.run_function(task)
                 except Exception as err:  # pylint: disable=W0703
                     result = err
                 self.logger.debug(f'{task!s} Result: {result!r}')
