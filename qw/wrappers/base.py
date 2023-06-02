@@ -18,6 +18,7 @@ class QueueWrapper(ABC):
         self._id = uuid.uuid4()
         self.args = args
         self.kwargs = kwargs
+        self.loop = None
 
     @property
     def queued(self):
