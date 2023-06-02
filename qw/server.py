@@ -209,7 +209,7 @@ class QWorker:
         fn.set_loop(loop)
         try:
             result = loop.run_until_complete(
-                self.run_function(fn, loop)
+                self.run_function(fn)
             )
             print("run_process completed normally")
             return result
@@ -271,13 +271,11 @@ class QWorker:
                     f'Running Queued Task: {task!s}'
                 )
                 try:
-                    # fn = partial(self.run_function, task)
                     fn = loop.create_task(self.run_task(task))
                     result = await fn
                     # with ThreadPoolExecutor(max_workers=2) as pool:
                     #     future = loop.run_in_executor(pool, fn)
                     #     result = await future
-                    print(f'RESULT > {result}')
                 except (RuntimeError) as err:
                     raise QWException(
                         f"Error: {err}"
@@ -481,9 +479,13 @@ class QWorker:
         else:
             try:
                 # executed and send result to client
+                loop = asyncio.get_running_loop()
                 task.id = uid
-                fn = partial(self.run_process, task)
-                return await self._loop.run_in_executor(self._executor, fn)
+                task.set_loop(loop)
+                fn = loop.create_task(
+                    self.run_function(task)
+                )
+                return await fn
             except Exception as err:  # pylint: disable=W0703
                 try:
                     result = cloudpickle.dumps(err)
@@ -530,7 +532,7 @@ class QWorker:
                 return False
         elif callable(task):
             result = await self.run_function(
-                task, self._loop
+                task
             )
         else:
             # put work in Queue:
