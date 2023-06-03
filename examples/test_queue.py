@@ -10,6 +10,8 @@ print('SERVER : ', qw.get_servers())
 
 
 async def very_long_task(seconds: int):
+    if seconds == 17:
+        raise ValueError('BAD BOYS')
     print(f'This Function Sleep for {seconds} sec.')
     await asyncio.sleep(seconds)
 
