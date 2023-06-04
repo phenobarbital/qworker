@@ -17,6 +17,7 @@ RESOURCE_THRESHOLD = config.getint('RESOURCE_THRESHOLD', fallback=90)
 CHECK_RESOURCE_USAGE = config.getboolean('CHECK_RESOURCE_USAGE', fallback=True)
 WORKER_RETRY_INTERVAL = config.getint('WORKER_RETRY_INTERVAL', fallback=10)
 WORKER_RETRY_COUNT = config.getint('WORKER_RETRY_COUNT', fallback=3)
+WORKER_CONCURRENCY_NUMBER = config.getint('WORKER_CONCURRENCY_NUMBER', fallback=4)
 
 ## ID for saving worker list on Redis
 QW_WORKER_LIST = 'QW_WORKER_LIST'

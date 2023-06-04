@@ -3,11 +3,13 @@ import inspect
 from concurrent.futures import ThreadPoolExecutor
 from navconfig.logging import logging
 from ..wrappers import QueueWrapper, FuncWrapper, TaskWrapper
+from ..conf import WORKER_CONCURRENCY_NUMBER
 
 class TaskExecutor:
     def __init__(self, task, *args, **kwargs):
         self.logger = logging.getLogger('QS.Executor')
         self.task = task
+        self.semaphore = asyncio.Semaphore(WORKER_CONCURRENCY_NUMBER)
 
     async def run_task(self):
         result = None
@@ -35,7 +37,8 @@ class TaskExecutor:
                 result = await self.task()
             elif isinstance(self.task, TaskWrapper):
                 self.task.set_loop(loop)
-                result = await self.run_task()
+                async with self.semaphore:
+                    result = await self.run_task()
             elif (
                 inspect.isawaitable(self.task) or asyncio.iscoroutinefunction(self.task)
             ):
