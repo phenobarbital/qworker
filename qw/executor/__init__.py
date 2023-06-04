@@ -7,7 +7,7 @@ from ..conf import WORKER_CONCURRENCY_NUMBER
 
 class TaskExecutor:
     def __init__(self, task, *args, **kwargs):
-        self.logger = logging.getLogger('QS.Executor')
+        self.logger = logging.getLogger('QW.Executor')
         self.task = task
         self.semaphore = asyncio.Semaphore(WORKER_CONCURRENCY_NUMBER)
 

@@ -34,7 +34,7 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
             raise QWException(
                 f"Error getting event loop: {ex}"
             )
-        self.logger = logging.getLogger('QW:Discovery')
+        self.logger = logging.getLogger('QW.Discovery')
         self.transport = None
         super().__init__()
 
@@ -86,7 +86,7 @@ class QueueProtocol(asyncio.Protocol):
     def __init__(self, queue: asyncio.Queue, name: str):
         self.queue = queue
         self.logger = logging.getLogger(
-            f'QW:QueueServer-{name}'
+            f'QW.QueueServer-{name}'
         )
         self.transport = None
         self.loop = asyncio.get_event_loop()
