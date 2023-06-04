@@ -69,7 +69,7 @@ class SpawnProcess(object):
         raise_nofile(value=NOFILES)
         ## Logger:
         self.logger = logging.getLogger(
-            name='QW:WorkerProcess'
+            name='QW.WorkerProcess'
         )
         for i in range(args.workers):
             try:

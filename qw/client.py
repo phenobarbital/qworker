@@ -85,7 +85,7 @@ class QClient:
         except RuntimeError:
             raise
         ## logger:
-        self.logger = logging.getLogger('QW:Client')
+        self.logger = logging.getLogger('QW.Client')
         ## check if we use network discovery or redis list:
         if worker_list:
             self._workers = worker_list

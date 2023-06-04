@@ -75,7 +75,7 @@ class QWorker:
         self._protocol = protocol
         # logging:
         self.logger = logging.getLogger(
-            f'QW:Server:{self._name}:{self._id}'
+            f'QW.Server:{self._name}.{self._id}'
         )
 
     @property
