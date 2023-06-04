@@ -1,7 +1,8 @@
 """TaskWrapper.
 
-Wrapping a DI-task to be executed by Worker.
+Wrapping a Flowtask-task to be executed by Worker.
 """
+import asyncio
 import multiprocessing as mp
 from navconfig.logging import logging
 try:
@@ -13,9 +14,9 @@ try:
     )
 except ImportError:
     logging.warning(
-        "Unable to Load DataIntegrator Task Component, we can't send DI Tasks to any Worker."
+        "Unable to Load FlowTask Task Component, we can't send Tasks to any Worker."
     )
-from qw.exceptions import ProcessNotFound, QWException
+from qw.exceptions import QWException
 from .base import QueueWrapper
 
 class TaskWrapper(QueueWrapper):
@@ -51,18 +52,22 @@ class TaskWrapper(QueueWrapper):
 
     async def create(self):
         try:
+            loop = self.loop
+        except AttributeError:
+            loop = asyncio.get_running_loop()
+        try:
             self._task = Task(
                 task=self.task,
                 program=self.program,
                 task_id=self.id,
-                loop=self.loop,
+                loop=loop,
                 worker=mp.current_process(),
                 new_args=self.new_args,
                 debug=self._debug,
                 **self.kwargs
             )
         except TaskNotFound as ex:
-            raise ProcessNotFound(
+            raise TaskNotFound(
                 f"Task Not Found: {ex}"
             )
         except TaskError:
@@ -93,7 +98,9 @@ class TaskWrapper(QueueWrapper):
             }
             return result
         except Exception as err:  # pylint: disable=W0703
-            return TaskFailed(str(err))
+            raise TaskFailed(
+                f"{err}"
+            )
         finally:
             await self.close()
 
