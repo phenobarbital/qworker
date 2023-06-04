@@ -3,20 +3,22 @@ import time
 from typing import Union
 from collections.abc import Awaitable, Callable
 from navconfig.logging import logging
+from qw.exceptions import QWException
 from ..conf import (
     WORKER_QUEUE_SIZE,
     WORKER_RETRY_INTERVAL,
     WORKER_RETRY_COUNT
 )
-
+from ..executor import TaskExecutor
 from ..wrappers.base import QueueWrapper
 
 class QueueManager:
     """base Class for all Queue Managers in Queue Worker.
     """
 
-    def __init__(self):
+    def __init__(self, worker_name: str):
         self.logger = logging.getLogger('QW.Queue')
+        self.worker_name = worker_name
         self.queue: asyncio.Queue = asyncio.Queue(
             maxsize=WORKER_QUEUE_SIZE
         )
@@ -95,42 +97,51 @@ class QueueManager:
         return task
 
     async def queue_handler(self):
+        """Method for handling the tasks received by the connection handler."""
         while True:
             result = None
             task = await self.queue.get()
-            self.logger.info(
-                f"Task started {task}"
+            self.logger.notice(
+                f"Task started {task} on {self.worker_name}"
             )
             ### Process Task:
             try:
-                result = await task()
-                print('RESULT >>>> ', result)
-                await self._callback(
-                    task, result=result
-                )
+                executor = TaskExecutor(task)
+                result = await executor.run()
+                if isinstance(result, BaseException):
+                    if task.retries < WORKER_RETRY_COUNT:
+                        task.add_retries()
+                        self.logger.warning(
+                            f"Task {task} failed. Retrying. Retry count: {task.retries}"
+                        )
+                        # Wait some seconds before retrying.
+                        await asyncio.sleep(WORKER_RETRY_INTERVAL)
+                        await self.queue.put(task)
+                    else:
+                        cnt = WORKER_RETRY_COUNT
+                        self.logger.warning(
+                            f"{task} Failed after {cnt} times. Discarding task."
+                        )
+                        raise result
                 self.logger.debug(
                     f'Consumed Task: {task} at {int(time.time())}'
                 )
+            except RuntimeError as exc:
+                result = exc
+                raise QWException(
+                    f"Error: {exc}"
+                ) from exc
             except Exception as exc:
                 self.logger.error(
                     f"Task failed with error: {exc}"
                 )
-                if task.retries < WORKER_RETRY_COUNT:
-                    task.add_retries()
-                    self.logger.info(
-                        f"Task {task} failed. Retrying. Retry count: {task.retries}"
-                    )
-                    # Wait some seconds before retrying.
-                    await asyncio.sleep(WORKER_RETRY_INTERVAL)
-                    await self.queue.put(task)
-                else:
-                    cnt = WORKER_RETRY_COUNT
-                    self.logger.info(
-                        f"{task} Failed after {cnt} times. Discarding task."
-                    )
+                raise
             finally:
                 ### Task Completed
                 self.queue.task_done()
+                await self._callback(
+                    task, result=result
+                )
             self.logger.debug(
                 f'QUEUE Size after Work: {self.queue.qsize()}'
             )

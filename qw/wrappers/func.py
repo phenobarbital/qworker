@@ -1,5 +1,7 @@
 """Functional Wrapper."""
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from .base import QueueWrapper
 
 class FuncWrapper(QueueWrapper):
@@ -14,10 +16,17 @@ class FuncWrapper(QueueWrapper):
         if asyncio.iscoroutinefunction(self.func):
             return await self.func(*self.args, **self.kwargs)
         else:
-            return self.func(*self.args, **self.kwargs)
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.get_event_loop()
+            fn = partial(self.func, *self.args, **self.kwargs)
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future = loop.run_in_executor(executor, fn)
+            return await future
 
     def __repr__(self) -> str:
-        return '<%s> from %s' % (self.func.__name__, self.host) # pylint: disable=C0209
+        return '<%s> from %s' % (self.func.__name__, self.host)  # pylint: disable=C0209
 
     def __str__(self):
-        return '<%s> from %s' % (self.func.__name__, self.host) # pylint: disable=C0209
+        return '<%s> from %s' % (self.func.__name__, self.host)  # pylint: disable=C0209

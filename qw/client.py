@@ -3,6 +3,7 @@ import asyncio
 import itertools
 import random
 import warnings
+import inspect
 from typing import Any
 from collections.abc import Callable
 from collections import defaultdict
@@ -139,7 +140,11 @@ class QClient:
     def register_pickle_module(self, module: Any):
         cloudpickle.register_pickle_by_value(module)
 
-    async def validate_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> tuple:
+    async def validate_connection(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter
+    ) -> tuple:
         signature = make_signature(expected_message, WORKER_SECRET_KEY)
         writer.write(b'%d\n' % len(signature))
         writer.write(signature)
@@ -211,7 +216,7 @@ class QClient:
                 self._num_retries[worker] += 1
                 if self._num_retries[worker] > MAX_RETRY_COUNT:
                     raise ConnectionError(
-                        f'Max number of retries is reached for {worker!r}, error: {err!s}'
+                        f'Max number of retries reached for {worker!r}, error: {err!s}'
                     ) from err
                 warnings.warn(
                     f"Can't connect to {worker!r}. Retrying..."
@@ -347,7 +352,7 @@ class QClient:
                 try:
                     a = orjson.loads(el)
                     res.append(a)
-                except (TypeError, ValueError) as err:
+                except (TypeError, ValueError):
                     res.append(el)
             return res
         elif isinstance(task_result, dict):
@@ -400,6 +405,8 @@ class QClient:
         if isinstance(fn, (FuncWrapper, TaskWrapper)):
             # Function was wrapped or is already wrapped
             func = fn
+        elif not asyncio.iscoroutinefunction(fn):
+            func = fn(*args, **kwargs)
         else:
             func = FuncWrapper(
                 host,
@@ -408,6 +415,7 @@ class QClient:
                 **kwargs
             )
         # serializing
+        print('FN: ', func, func.__class__.__name__)
         try:
             # getting data
             serialized_task = cloudpickle.dumps(func)
