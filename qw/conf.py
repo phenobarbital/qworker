@@ -19,6 +19,11 @@ WORKER_RETRY_INTERVAL = config.getint('WORKER_RETRY_INTERVAL', fallback=10)
 WORKER_RETRY_COUNT = config.getint('WORKER_RETRY_COUNT', fallback=3)
 WORKER_CONCURRENCY_NUMBER = config.getint('WORKER_CONCURRENCY_NUMBER', fallback=4)
 
+## Queue Consumed Callback
+WORKER_QUEUE_CALLBACK = config.get(
+    'WORKER_QUEUE_CALLBACK', fallback=None
+)
+
 ## ID for saving worker list on Redis
 QW_WORKER_LIST = 'QW_WORKER_LIST'
 
@@ -34,6 +39,8 @@ WORKER_DEFAULT_MULTICAST = config.get(
 expected_message = config.get('WORKER_DISCOVERY_MESSAGE')
 WORKER_SECRET_KEY = config.get('WORKER_SECRET_KEY')
 
+
+### Redis Transport
 REDIS_HOST = config.get('REDIS_HOST', fallback='localhost')
 REDIS_PORT = config.getint('REDIS_PORT', fallback=6379)
 REDIS_WORKER_DB = config.getint('REDIS_WORKER_DB', fallback=2)

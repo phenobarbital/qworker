@@ -2,12 +2,14 @@ import asyncio
 import time
 from typing import Union
 from collections.abc import Awaitable, Callable
+import importlib
 from navconfig.logging import logging
 from qw.exceptions import QWException
 from ..conf import (
     WORKER_QUEUE_SIZE,
     WORKER_RETRY_INTERVAL,
-    WORKER_RETRY_COUNT
+    WORKER_RETRY_COUNT,
+    WORKER_QUEUE_CALLBACK
 )
 from ..executor import TaskExecutor
 from ..wrappers.base import QueueWrapper
@@ -26,6 +28,33 @@ class QueueManager:
         self.logger.debug(
             f'Started Queue Manager with size: {WORKER_QUEUE_SIZE}'
         )
+        ### Getting Queue Callback (called when queue object is consumed)
+        self._callback: Union[Callable, Awaitable] = self.get_callback(
+            WORKER_QUEUE_CALLBACK
+        )
+        self.logger.notice(
+            f'Callback Queue: {self._callback!r}'
+        )
+
+    async def task_callback(self, task, **kwargs):
+        self.logger.notice(
+            f'Task Consumed >>> {task!r} with ID {task.id}'
+        )
+
+    def get_callback(self, done_callback: str) -> Union[Callable, Awaitable]:
+        if not done_callback:
+            ## returns a simple logger:
+            return self.task_callback
+        try:
+            parts = done_callback.split(".")
+            bkname = parts.pop()
+            classpath = ".".join(parts)
+            module = importlib.import_module(classpath, package=bkname)
+            return getattr(module, bkname)
+        except ImportError as ex:
+            raise RuntimeError(
+                f"Error loading Queue Callback {done_callback}: {ex}"
+            ) from ex
 
     def size(self):
         return self.queue.qsize()
@@ -36,15 +65,13 @@ class QueueManager:
     def full(self):
         return self.queue.full()
 
-    async def fire_consumers(self, done_callback: Union[Callable, Awaitable]):
+    async def fire_consumers(self):
         """Fire up the Task consumers."""
         for _ in range(WORKER_QUEUE_SIZE - 1):
             task = asyncio.create_task(
                 self.queue_handler()
             )
             self.consumers.append(task)
-        # done callback:
-        self._callback = done_callback
 
     async def empty_queue(self):
         """Processing and shutting down the Queue."""
@@ -138,7 +165,9 @@ class QueueManager:
                 raise
             finally:
                 ### Task Completed
+                print('============== LLEGA AQUI ==============')
                 self.queue.task_done()
+                print('============== LLEGA AQUI ==============')
                 await self._callback(
                     task, result=result
                 )
