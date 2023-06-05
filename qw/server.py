@@ -301,7 +301,8 @@ class QWorker:
                 f'TASK RECEIVED: {task} at {int(time.time())}'
             )
             return task
-        except RuntimeError as ex:
+        except (EOFError, RuntimeError) as ex:
+            ### Empty Task:
             ex = ParserError(
                 f"Error Decoding Serialized Task: {ex}"
             )
