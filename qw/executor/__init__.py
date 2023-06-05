@@ -23,7 +23,7 @@ class TaskExecutor:
             result = err
         finally:
             await self.task.close()
-        return result
+            return result
 
     async def run(self):
         result = None

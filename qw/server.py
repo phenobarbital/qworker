@@ -21,7 +21,8 @@ from .conf import (
     WORKER_DEFAULT_PORT,
     WORKER_DEFAULT_QTY,
     expected_message,
-    WORKER_SECRET_KEY
+    WORKER_SECRET_KEY,
+    WORKER_QUEUE_CALLBACK
 )
 from .utils.json import json_encoder
 from .utils.versions import get_versions
@@ -114,11 +115,11 @@ class QWorker:
             raise QWException(
                 f"Error: {err}"
             ) from err
+        # Getting Tasks Callback (run when task is consumed from Queue)
+
         # Serve requests until Ctrl+C is pressed
         try:
-            await self.queue.fire_consumers(
-                done_callback=self.task_callback
-            )
+            await self.queue.fire_consumers()
             async with self._server:
                 await self._server.serve_forever()
         except (RuntimeError, KeyboardInterrupt) as err:
@@ -152,9 +153,6 @@ class QWorker:
                 '::: QueueWorker Server Closed ::: ',
                 level='INFO'
             )
-
-    async def task_callback(self, task, **kwargs):
-        self.logger.debug('RUNNING TASK >>> {task}')
 
     def check_signature(self, payload: bytes) -> bool:
         signature = make_signature(expected_message, WORKER_SECRET_KEY)
