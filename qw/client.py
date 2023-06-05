@@ -4,8 +4,8 @@ import itertools
 import random
 import warnings
 import inspect
-from typing import Any
-from collections.abc import Callable
+from typing import Any, Union
+from collections.abc import Callable, Awaitable
 from collections import defaultdict
 from functools import partial
 import aioredis
@@ -241,6 +241,89 @@ class QClient:
         self.logger.debug('Closing Socket')
         writer.close()
 
+    async def get_worker_connection(self):
+        try:
+            reader, writer = await self.get_connection()
+            return reader, writer
+        except DiscardedTask:
+            await asyncio.sleep(WAIT_TIME)
+            ### ask again after wait for new connection:
+            reader, writer = await self.get_connection()
+            return reader, writer
+        except ConnectionError as ex:
+            raise ConnectionError(
+                f"Unable to Connect to Queue Worker: {ex}"
+            ) from ex
+        except Exception as err:
+            self.logger.error(err)
+            raise
+
+    async def sendto_worker(
+        self,
+        func: Union[Callable, Awaitable],
+        writer: asyncio.StreamWriter
+    ):
+        serialized_task = None
+        try:
+            serialized_task = cloudpickle.dumps(func)
+            writer.write(serialized_task)
+            # sending data to worker:
+            if writer.can_write_eof():
+                writer.write_eof()
+            await writer.drain()
+        except Exception as err:
+            self.logger.error(
+                f'Error Serializing Task {func!r}: {err!s}'
+            )
+            raise
+        return serialized_task
+
+    async def get_result(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter
+    ):
+        result = None
+        try:
+            while True:
+                result = await reader.read(-1)
+                if reader.at_eof():
+                    break
+        except Exception as ex:
+            raise QWException(
+                f"Error getting results from Worker: {ex}"
+            ) from ex
+        finally:
+            await self.close(writer)
+            return result
+
+    def get_wrapped_function(
+        self,
+        fn: Any,
+        host: str,
+        *args,
+        use_wrapper: bool = False,
+        queued: bool = False,
+        **kwargs
+    ):
+        if isinstance(fn, (TaskWrapper, FuncWrapper)):
+            # already wrapped
+            func = fn
+            func.queued = queued
+        elif use_wrapper is True:
+            # wrap function into a Wrapper:
+            func = FuncWrapper(
+                host,
+                fn,
+                *args,
+                **kwargs
+            )
+            func.queued = queued
+        else:
+            # sent function *as is* using partial
+            func = partial(fn, *args, **kwargs)
+        return func
+
     async def run(self, fn: Any, *args, use_wrapper: bool = False, **kwargs):
         """Runs a function in Queue Worker
 
@@ -260,62 +343,25 @@ class QClient:
             ConnectionError: unable to connect to Worker.
             Exception: Any Unhandled error.
         """
-        try:
-            reader, writer = await self.get_connection()
-        except DiscardedTask:
-            await asyncio.sleep(WAIT_TIME)
-            ### ask again after wait for new connection:
-            reader, writer = await self.get_connection()
-        except ConnectionError as ex:
-            raise ConnectionError(
-                f"Unable to Connect to Queue Worker: {ex}"
-            ) from ex
-        except Exception as err:
-            self.logger.error(err)
-            raise
+        reader, writer = await self.get_worker_connection()
 
         host, *_ = writer.get_extra_info('sockname')
         # wrapping the function into Task Wrapper
-        self.logger.debug(f'Sending Object {fn!s} to Worker {host}')
-        if isinstance(fn, (TaskWrapper, FuncWrapper)):
-            # already wrapped
-            func = fn
-            func.queued = False
-        elif use_wrapper is True:
-            # wrap function into a Wrapper:
-            func = FuncWrapper(
-                host,
-                fn,
-                *args,
-                **kwargs
-            )
-            func.queued = False
-        else:
-            # sent function *as is*
-            func = partial(fn, *args, **kwargs)
-        try:
-            serialized_task = cloudpickle.dumps(func)
-            writer.write(serialized_task)
-            # sending data to worker:
-            if writer.can_write_eof():
-                writer.write_eof()
-            await writer.drain()
-        except Exception as err:
-            self.logger.error(f'Error Serializing Task: {err!s}')
-            raise
+        self.logger.debug(
+            f'Sending Object {fn!s} to Worker {host}'
+        )
+        func = self.get_wrapped_function(
+            fn,
+            host,
+            *args,
+            use_wrapper=use_wrapper,
+            queued=False,
+            **kwargs
+        )
+        ## send data to worker:
+        await self.sendto_worker(func, writer)
         # Then, got the result:
-        serialized_result = None
-        try:
-            while True:
-                serialized_result = await reader.read(-1)
-                if reader.at_eof():
-                    break
-        except Exception as ex:
-            raise QWException(
-                f"Error getting results from Worker: {ex}"
-            ) from ex
-        finally:
-            await self.close(writer)
+        serialized_result = await self.get_result(reader, writer)
         try:
             task_result = cloudpickle.loads(serialized_result)
             self.logger.debug(
@@ -327,10 +373,10 @@ class QClient:
                 else:
                     result = task_result
             except (TypeError, ValueError) as e:
-                print(e)
+                logging.error(e)
                 result = task_result
             except Exception as e:
-                print(e)
+                logging.error(e)
             task_result = result
         except (ValueError, TypeError) as ex:
             raise ParserError(
@@ -372,7 +418,7 @@ class QClient:
         else:
             return task_result
 
-    async def queue(self, fn: Any, *args, **kwargs):
+    async def queue(self, fn: Any, *args, use_wrapper: bool = True, **kwargs):
         """Send a function to a Queue Worker and return.
 
         Send & Forget functionality to send a task to Queue Worker.
@@ -391,39 +437,23 @@ class QClient:
             Exception: Any Unhandled error.
         """
         # TODO: Use Task id to return (later) the result of Task.
-        try:
-            reader, writer = await self.get_connection()
-        except DiscardedTask:
-            await asyncio.sleep(WAIT_TIME)
-            ### ask again after wait for new connection:
-            reader, writer = await self.get_connection()
-        except Exception as err:
-            self.logger.error(err)
-            raise
-        self.logger.debug(f'Sending function {fn!s} to Worker')
+        reader, writer = await self.get_worker_connection()
+        self.logger.debug(
+            f'Sending function {fn!s} to Worker'
+        )
         host, *_ = writer.get_extra_info('sockname')
-        if isinstance(fn, (FuncWrapper, TaskWrapper)):
-            # Function was wrapped or is already wrapped
-            func = fn
-        elif not asyncio.iscoroutinefunction(fn):
-            func = fn(*args, **kwargs)
-        else:
-            func = FuncWrapper(
-                host,
-                fn,
-                *args,
-                **kwargs
-            )
         # serializing
-        print('FN: ', func, func.__class__.__name__)
+        func = self.get_wrapped_function(
+            fn,
+            host,
+            *args,
+            use_wrapper=use_wrapper,
+            queued=True,
+            **kwargs
+        )
         try:
-            # getting data
-            serialized_task = cloudpickle.dumps(func)
-            writer.write(serialized_task)
-            # sending data to worker:
-            if writer.can_write_eof():
-                writer.write_eof()
-            await writer.drain()
+            ## send data to worker:
+            await self.sendto_worker(func, writer=writer)
             # asks server if task was queued:
             try:
                 while True:

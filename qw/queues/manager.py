@@ -165,9 +165,7 @@ class QueueManager:
                 raise
             finally:
                 ### Task Completed
-                print('============== LLEGA AQUI ==============')
                 self.queue.task_done()
-                print('============== LLEGA AQUI ==============')
                 await self._callback(
                     task, result=result
                 )
