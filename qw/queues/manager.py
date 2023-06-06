@@ -135,8 +135,10 @@ class QueueManager:
             try:
                 executor = TaskExecutor(task)
                 result = await executor.run()
+                if type(result) == asyncio.TimeoutError:
+                    raise
                 if isinstance(result, BaseException):
-                    if task.retries < WORKER_RETRY_COUNT:
+                    if task.retries <= WORKER_RETRY_COUNT:
                         task.add_retries()
                         self.logger.warning(
                             f"Task {task} failed. Retrying. Retry count: {task.retries}"

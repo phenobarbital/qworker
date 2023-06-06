@@ -368,7 +368,7 @@ class QWorker:
         # first time: check signature authentication of payload:
         if not await self.signature_validation(reader, writer):
             return False
-        self.logger.debug(
+        self.logger.info(
             f"Received Data from {addr!r} to worker {self.name!s} pid: {self._pid}"
         )
         # after: deserialize Task:
