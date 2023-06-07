@@ -16,7 +16,7 @@ WORKER_QUEUE_SIZE = config.getint('WORKER_QUEUE_SIZE', fallback=8)
 RESOURCE_THRESHOLD = config.getint('RESOURCE_THRESHOLD', fallback=90)
 CHECK_RESOURCE_USAGE = config.getboolean('CHECK_RESOURCE_USAGE', fallback=True)
 WORKER_RETRY_INTERVAL = config.getint('WORKER_RETRY_INTERVAL', fallback=10)
-WORKER_RETRY_COUNT = config.getint('WORKER_RETRY_COUNT', fallback=3)
+WORKER_RETRY_COUNT = config.getint('WORKER_RETRY_COUNT', fallback=2)
 WORKER_CONCURRENCY_NUMBER = config.getint('WORKER_CONCURRENCY_NUMBER', fallback=4)
 WORKER_TASK_TIMEOUT = config.getint('WORKER_TASK_TIMEOUT', fallback=30)
 

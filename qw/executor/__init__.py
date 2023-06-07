@@ -40,7 +40,7 @@ class TaskExecutor:
             result = task.result()
         except Exception as err:  # pylint: disable=W0703
             self.logger.error(
-                f"An Error occurred while running Task {self.task}"
+                f"An Error occurred while running Task {self.task}: {err}"
             )
             result = err
         finally:
@@ -55,7 +55,9 @@ class TaskExecutor:
     def get_notify(self):
         # TODO: implement other notify connectors:
         # defining the Default chat object:
-        recipient = Chat(**{"chat_id": EVENT_CHAT_ID, "chat_name": "Navigator"})
+        recipient = Chat(
+            **{"chat_id": EVENT_CHAT_ID, "chat_name": "Navigator"}
+        )
         # send notifications to Telegram bot
         tm = Telegram()
         return [tm, recipient]
