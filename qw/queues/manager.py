@@ -4,6 +4,10 @@ from typing import Union
 from collections.abc import Awaitable, Callable
 import importlib
 from navconfig.logging import logging
+from flowtask.exceptions import (
+    DataNotFound,
+    FileNotFound
+)
 from qw.exceptions import QWException
 from ..conf import (
     WORKER_QUEUE_SIZE,
@@ -13,6 +17,7 @@ from ..conf import (
 )
 from ..executor import TaskExecutor
 from ..wrappers.base import QueueWrapper
+
 
 class QueueManager:
     """base Class for all Queue Managers in Queue Worker.
@@ -94,8 +99,8 @@ class QueueManager:
             task (QueueWrapper): an instance of QueueWrapper
         """
         try:
-            # await self.queue.put(task)
-            _ = asyncio.create_task(self.queue.put(task))
+            await self.queue.put(task)
+            await asyncio.sleep(.1)
             self.logger.info(
                 f'Task {task!s} with id {id} was queued at {int(time.time())}'
             )
@@ -137,8 +142,10 @@ class QueueManager:
                 result = await executor.run()
                 if type(result) == asyncio.TimeoutError:
                     raise
-                if isinstance(result, BaseException):
-                    if task.retries <= WORKER_RETRY_COUNT:
+                elif type(result) in (DataNotFound, FileNotFound):
+                    raise
+                elif isinstance(result, BaseException):
+                    if task.retries < WORKER_RETRY_COUNT:
                         task.add_retries()
                         self.logger.warning(
                             f"Task {task} failed. Retrying. Retry count: {task.retries}"

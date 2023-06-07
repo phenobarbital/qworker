@@ -8,6 +8,7 @@ from navconfig.logging import logging
 try:
     from flowtask.tasks.task import Task
     from flowtask.exceptions import (
+        TaskException,
         TaskNotFound,
         TaskError,
         TaskFailed
@@ -46,6 +47,9 @@ class TaskWrapper(QueueWrapper):
 
     def task_id(self):
         return f'{self.id!s}'
+
+    def task_obj(self):
+        return self._task
 
     def __repr__(self):
         return f'Task(task={self.task}, program={self.program}, debug={self._debug})'
@@ -117,6 +121,8 @@ class TaskWrapper(QueueWrapper):
                     )
             except Exception as err:
                 logging.error(str(err), exc_info=True)
+                if isinstance(err, TaskException):
+                    raise
                 raise TaskFailed(
                     f"{err}"
                 ) from err
@@ -127,9 +133,12 @@ class TaskWrapper(QueueWrapper):
                 result = await task.run()
             except Exception as err:
                 logging.exception(err, stack_info=False)
-                raise TaskFailed(
-                    f"{err}"
-                ) from err
+                if isinstance(err, TaskException):
+                    raise
+                else:
+                    raise TaskFailed(
+                        f"{err}"
+                    ) from err
         return result
 
     async def close(self):
