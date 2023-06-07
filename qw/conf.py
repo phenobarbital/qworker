@@ -18,7 +18,7 @@ CHECK_RESOURCE_USAGE = config.getboolean('CHECK_RESOURCE_USAGE', fallback=True)
 WORKER_RETRY_INTERVAL = config.getint('WORKER_RETRY_INTERVAL', fallback=10)
 WORKER_RETRY_COUNT = config.getint('WORKER_RETRY_COUNT', fallback=3)
 WORKER_CONCURRENCY_NUMBER = config.getint('WORKER_CONCURRENCY_NUMBER', fallback=4)
-WORKER_TASK_TIMEOUT = config.getint('WORKER_TASK_TIMEOUT', fallback=1)
+WORKER_TASK_TIMEOUT = config.getint('WORKER_TASK_TIMEOUT', fallback=30)
 
 ## Queue Consumed Callback
 WORKER_QUEUE_CALLBACK = config.get(
