@@ -145,7 +145,7 @@ class QueueManager:
                 elif type(result) in (DataNotFound, FileNotFound):
                     raise
                 elif isinstance(result, BaseException):
-                    if task.retries < WORKER_RETRY_COUNT:
+                    if task.retries < WORKER_RETRY_COUNT - 1:
                         task.add_retries()
                         self.logger.warning(
                             f"Task {task} failed. Retrying. Retry count: {task.retries}"
