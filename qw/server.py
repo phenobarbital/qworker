@@ -5,6 +5,7 @@ import socket
 import uuid
 import asyncio
 import inspect
+import random
 from typing import Any
 from collections.abc import Callable
 import multiprocessing as mp
@@ -16,13 +17,14 @@ from qw.exceptions import (
     DiscardedTask
 )
 from qw.utils import make_signature
+from redis import asyncio as aioredis
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
-    WORKER_DEFAULT_QTY,
     expected_message,
     WORKER_SECRET_KEY,
-    WORKER_QUEUE_CALLBACK
+    REDIS_WORKER_CHANNEL,
+    WORKER_REDIS
 )
 from .utils.json import json_encoder
 from .utils.versions import get_versions
@@ -36,10 +38,6 @@ from .executor import TaskExecutor
 DEFAULT_HOST = WORKER_DEFAULT_HOST
 if not DEFAULT_HOST:
     DEFAULT_HOST = socket.gethostbyname(socket.gethostname())
-
-
-# Initialize a semaphore with Worker Limit
-semaphore = asyncio.Semaphore(WORKER_DEFAULT_QTY)
 
 
 class QWorker:
@@ -66,6 +64,7 @@ class QWorker:
         self.debug = debug
         self.queue = None
         self._id = worker_id
+        self._running: bool = True
         if name:
             self._name = name
         else:
@@ -83,9 +82,81 @@ class QWorker:
     def name(self):
         return self._name
 
+    def start_redis(self):
+        self.pool = aioredis.ConnectionPool.from_url(
+            WORKER_REDIS,
+            encoding='utf8',
+            decode_responses=True,
+            max_connections=5000
+        )
+        self.redis = aioredis.Redis(connection_pool=self.pool)
+
+    async def start_subscription(self):
+        """Starts PUB/SUB system based on Redis."""
+        try:
+            self.pubsub = self.redis.pubsub()
+            await self.pubsub.subscribe(REDIS_WORKER_CHANNEL)
+
+            while self._running:
+                try:
+                    msg = await self.pubsub.get_message()
+                    if msg and msg['type'] == 'message':
+                        self.logger.debug(f'Received Task: {msg}')
+                    await asyncio.sleep(0.001)  # sleep a bit to prevent high CPU usage
+                except ConnectionResetError:
+                    self.logger.error(
+                        "Connection was closed, trying to reconnect."
+                    )
+                    await asyncio.sleep(1)  # Wait for a bit before trying to reconnect
+                    await self.start_subscription()  # Try to restart the subscription
+                except asyncio.CancelledError:
+                    await self.pubsub.unsubscribe(REDIS_WORKER_CHANNEL)
+                    break
+                except KeyboardInterrupt:
+                    break
+                except Exception as exc:
+                    # Handle other exceptions as necessary
+                    self.logger.error(
+                        f"Error in start_subscription: {exc}"
+                    )
+                    break
+        except Exception as exc:
+            self.logger.error(
+                f"Could not establish initial connection: {exc}"
+            )
+
+    async def close_redis(self):
+        try:
+            # Get a new pubsub object and unsubscribe from 'channel'
+            try:
+                await self.pubsub.unsubscribe(REDIS_WORKER_CHANNEL)
+                await asyncio.wait_for(self.redis.close(), timeout=2.0)
+            except asyncio.TimeoutError:
+                self.logger.error(
+                    "Redis took too long to close."
+                )
+            await self.pool.disconnect(
+                inuse_connections=True
+            )
+        except RuntimeError as err:
+            self.logger.exception(
+                err, stack_info=True
+            )
+        try:
+            self.subscription_task.cancel()
+            await self.subscription_task
+        except asyncio.CancelledError:
+            pass
+
     async def start(self):
+        # Redis Service:
+        self.start_redis()
         """Starts Queue Manager."""
         self.queue = QueueManager(worker_name=self._name)
+        # Subscription Manager:
+        self.subscription_task = self._loop.create_task(
+            self.start_subscription()
+        )
         try:
             if self._protocol:
                 self._server = await self._loop.create_server(
@@ -126,6 +197,7 @@ class QWorker:
             self.logger.exception(err, stack_info=True)
 
     async def shutdown(self):
+        self._running = False
         if self.debug is True:
             cPrint(
                 f'Shutting down worker {self.name!s}'
@@ -133,6 +205,11 @@ class QWorker:
         try:
             # forcing close the queue
             await self.queue.empty_queue()
+        except KeyboardInterrupt:
+            pass
+        try:
+            # closing redis:
+            await self.close_redis()
         except KeyboardInterrupt:
             pass
         try:
@@ -221,6 +298,7 @@ class QWorker:
         exc = DiscardedTask(
             message
         )
+        self.logger.critical(message, stack_info=True)
         result = cloudpickle.dumps(exc)
         await self.closing_writer(
             writer,
@@ -297,7 +375,7 @@ class QWorker:
     async def deserialize_task(self, serialized_task, writer: asyncio.StreamWriter):
         try:
             task = cloudpickle.loads(serialized_task)
-            self.logger.debug(
+            self.logger.info(
                 f'TASK RECEIVED: {task} at {int(time.time())}'
             )
             return task
@@ -332,10 +410,11 @@ class QWorker:
                     f"Worker {self.name!s} Queue is Full, discarding Task {task!r}"
                 )
         else:
+            result = None
             try:
                 # executed and send result to client
                 executor = TaskExecutor(task)
-                return await executor.run()
+                result = await executor.run()
             except Exception as err:  # pylint: disable=W0703
                 try:
                     result = cloudpickle.dumps(err)
@@ -347,6 +426,8 @@ class QWorker:
                     )
                 await self.closing_writer(writer, result)
                 return False
+            finally:
+                return result
 
     async def connection_handler(
             self,
@@ -378,11 +459,16 @@ class QWorker:
         task = await self.deserialize_task(
             serialized_task, writer
         )
-        task_uuid = uuid.uuid4()
         if not task:
+            self.logger.error(f'No Task was received, received: {serialized_task}')
+            await self.closing_writer(writer, result)
             return False
-        elif isinstance(task, QueueWrapper):
+        task_uuid = task.id if task.id else uuid.uuid1(
+            node=random.getrandbits(48) | 0x010000000000
+        )
+        if isinstance(task, QueueWrapper):
             if not (result := await self.handle_queue_wrapper(task, task_uuid, writer)):
+                await self.closing_writer(writer, result)
                 return False
         elif callable(task):
             executor = TaskExecutor(task)
@@ -397,6 +483,7 @@ class QWorker:
                     message=f'Task {task!s} was discarded, queue full',
                     writer=writer
                 )
+        print('RESULT > ', result)
         if result is None:
             # Not always a Task returns Value, sometimes returns None.
             result = [

@@ -3,7 +3,7 @@ Abstract Wrapper Base.
 
 Any other wrapper extends this.
 """
-from typing import Callable, Coroutine, Any
+import random
 import uuid
 
 # coro = Callable[[int], Coroutine[Any, Any, str]]
@@ -16,7 +16,9 @@ class QueueWrapper:
         if 'queued' in kwargs:
             self._queued = kwargs['queued']
             del kwargs['queued']
-        self._id = uuid.uuid4()
+        self._id = uuid.uuid1(
+            node=random.getrandbits(48) | 0x010000000000
+        )
         self.args = args
         self.kwargs = kwargs
         self.loop = None
