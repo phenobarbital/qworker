@@ -42,8 +42,8 @@ class QueueManager:
         )
 
     async def task_callback(self, task, **kwargs):
-        self.logger.notice(
-            f'Task Consumed >>> {task!r} with ID {task.id}'
+        self.logger.info(
+            f'Task Consumed: {task!r} with ID {task.id}'
         )
 
     def get_callback(self, done_callback: str) -> Union[Callable, Awaitable]:

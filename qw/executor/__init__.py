@@ -14,7 +14,9 @@ from ..conf import WORKER_CONCURRENCY_NUMBER, WORKER_TASK_TIMEOUT
 
 class TaskExecutor:
     def __init__(self, task, *args, **kwargs):
-        self.logger = logging.getLogger('QW.Executor')
+        self.logger = logging.getLogger(
+            'QW.Executor'
+        )
         self.task = task
         self.semaphore = asyncio.Semaphore(WORKER_CONCURRENCY_NUMBER)
 
@@ -24,23 +26,18 @@ class TaskExecutor:
             f"Running Task: {self.task!s}"
         )
         try:
-            await self.task.create()
-            task = asyncio.create_task(self.task.run())
+            task = asyncio.create_task(self.task())
             task.add_done_callback(self.task_done)
-            _, pending = await asyncio.wait(
-                [task], timeout=WORKER_TASK_TIMEOUT * 60
+            result = await asyncio.wait_for(
+                task, timeout=WORKER_TASK_TIMEOUT * 60
             )
-            if task in pending:
-                await self.task_pending(task)
-                task.cancel()
-                raise asyncio.TimeoutError(
-                    f"Task {self.task} was cancelled."
-                )
-            # get the result:
-            result = task.result()
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError(
+                f"Task {self.task} with id {self.task.id} was cancelled."
+            )
         except Exception as err:  # pylint: disable=W0703
             self.logger.error(
-                f"An Error occurred while running Task {self.task}: {err}"
+                f"An Error occurred while running Task {self.task}.{self.task.id}: {err}"
             )
             result = err
         finally:
@@ -48,9 +45,10 @@ class TaskExecutor:
             return result
 
     def task_done(self, task, *args, **kwargs):
-        self.logger.notice(
+        self.logger.info(
             f"Finalized Task {task}"
         )
+        return True
 
     def get_notify(self):
         # TODO: implement other notify connectors:
@@ -101,7 +99,7 @@ class TaskExecutor:
                 self.task.set_loop(loop)
                 result = await self.task()
             elif isinstance(self.task, TaskWrapper):
-                self.logger.notice(
+                self.logger.info(
                     f"Running Task: {self.task}"
                 )
                 self.task.set_loop(loop)

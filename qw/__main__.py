@@ -69,8 +69,10 @@ def main():
         help="Start workers in Debug Mode"
     )
     args = parser.parse_args()
+    process = None
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         cPrint('::: Starting Workers ::: ')
         process = SpawnProcess(args)
         process.start()
@@ -80,7 +82,8 @@ def main():
     except Exception as ex:
         # log the unexpected error
         print(f"Unexpected error: {ex}")
-        process.terminate()
+        if process:
+            process.terminate()
     finally:
         cPrint('Shutdown all workers ...', level='WARN')
         loop.close()  # close the event loop

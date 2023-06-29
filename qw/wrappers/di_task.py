@@ -43,7 +43,10 @@ class TaskWrapper(QueueWrapper):
         self.task = task
         self._task = None
         self.args, self.kwargs = args, kwargs
-        self.id = task_id
+        if task_id is not None:
+            self.id = task_id
+        else:
+            self.id = self._id
 
     def task_id(self):
         return f'{self.id!s}'

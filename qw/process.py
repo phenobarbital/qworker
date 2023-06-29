@@ -7,7 +7,7 @@ from collections.abc import Callable
 import socket
 import aioredis
 from navconfig.logging import logging
-from qw.exceptions import QWException
+from qw.exceptions import QWException, ConfigError
 from qw.discovery import get_server_discovery
 from .utils import cPrint
 from .utils.json import json_encoder
@@ -15,7 +15,8 @@ from .conf import (
     NOFILES,
     WORKER_REDIS,
     QW_WORKER_LIST,
-    WORKER_DISCOVERY_PORT
+    WORKER_DISCOVERY_PORT,
+    QW_MAX_WORKERS
 )
 
 from .server import start_server
@@ -47,6 +48,16 @@ def raise_nofile(value: int = 4096) -> tuple[str, int]:
     return 'nofile', (soft, hard)
 
 
+def is_port_available(host, port):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((host, port))
+        sock.close()
+        return True
+    except OSError:
+        return False
+
 class SpawnProcess(object):
     def __init__(self, args):
         try:
@@ -71,6 +82,14 @@ class SpawnProcess(object):
         self.logger = logging.getLogger(
             name='QW.WorkerProcess'
         )
+        if args.workers > QW_MAX_WORKERS:
+            raise ConfigError(
+                f"Max Number of Workers exceeded: {args.workers}, exiting."
+            )
+        if not is_port_available(args.host, args.port):
+            raise RuntimeError(
+                "QW Error: Port is already in use"
+            )
         for i in range(args.workers):
             try:
                 p = mp.Process(
@@ -202,6 +221,15 @@ class SpawnProcess(object):
             raise
 
     def terminate(self):
+        for j in JOB_LIST:
+            try:
+                j.terminate()
+            except (OSError, AssertionError) as ex:
+                self.logger.error(ex)
+            try:
+                j.join()
+            except TypeError as ex:
+                self.logger.error(ex)
         try:
             self.loop.run_until_complete(
                 self.remove_worker()
@@ -209,15 +237,6 @@ class SpawnProcess(object):
             self.loop.run_until_complete(
                 self.stop_redis()
             )
-            for j in JOB_LIST:
-                try:
-                    j.terminate()
-                except (OSError, AssertionError) as ex:
-                    self.logger.exception(ex)
-                try:
-                    j.join()
-                except TypeError as ex:
-                    self.logger.exception(ex)
         except asyncio.TimeoutError as ex:
             self.logger.warning(
                 f"Timeout error: {ex}"
