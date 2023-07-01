@@ -2,13 +2,15 @@
 import asyncio
 import itertools
 import random
+import uuid
 import warnings
-import inspect
+import socket
+import base64
 from typing import Any, Union
 from collections.abc import Callable, Awaitable
 from collections import defaultdict
 from functools import partial
-import aioredis
+from redis import asyncio as aioredis
 import pickle
 import cloudpickle
 import jsonpickle
@@ -26,6 +28,7 @@ from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
     WORKER_REDIS,
+    REDIS_WORKER_STREAM,
     USE_DISCOVERY,
     WORKER_SECRET_KEY,
     expected_message
@@ -478,3 +481,61 @@ class QClient:
             self.logger.exception(
                 f'Error Serializing Task: {err!s}'
             )
+
+    async def publish(self, fn: Any, *args, use_wrapper: bool = True, **kwargs):
+        """Publish a function into a Pub/Sub Channel.
+
+        Send & Forget functionality to send a task to Queue Worker using Pub/Sub.
+
+        Args:
+            fn: Any Function, object or callable to be send to Worker.
+            args: any non-keyword arguments
+            kwargs: keyword arguments.
+
+        Returns:
+            None.
+
+        Raises:
+            ConfigError: bad instructions to Worker Client.
+            ConnectionError: unable to connect to Worker.
+            Exception: Any Unhandled error.
+        """
+        self.logger.debug(
+            f'Sending function {fn!s} to Pub/Sub Channel {REDIS_WORKER_STREAM}'
+        )
+        host = socket.gethostbyname(socket.gethostname())
+        # serializing
+        func = self.get_wrapped_function(
+            fn,
+            host,
+            *args,
+            use_wrapper=use_wrapper,
+            queued=True,
+            **kwargs
+        )
+        if use_wrapper is True:
+            uid = func.id
+        else:
+            uid = uuid.uuid1(
+                node=random.getrandbits(48) | 0x010000000000
+            )
+        serialized_task = cloudpickle.dumps(func)
+        encoded_task = base64.b64encode(serialized_task).decode('utf-8')
+        conn = aioredis.from_url(
+            WORKER_REDIS,
+            decode_responses=True,
+            encoding='utf-8'
+        )
+        message = {
+            "uid": str(uid),
+            "task": encoded_task
+        }
+        # check if published
+        # Add the data to the stream
+        result = await conn.xadd(REDIS_WORKER_STREAM, message)
+        serialized_result = {
+            "status": "Queued",
+            "task": f"{func!r}",
+            "message": result
+        }
+        return serialized_result
