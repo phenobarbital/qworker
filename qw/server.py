@@ -125,6 +125,9 @@ class QWorker:
             await self.ensure_group_exists()
             info = await self.redis.xinfo_groups(REDIS_WORKER_STREAM)
             self.logger.debug(f'Groups Info: {info}')
+            self.logger.debug(
+                f"Redis Server: {self.redis}"
+            )
             while self._running:
                 try:
                     message_groups = await self.redis.xreadgroup(
@@ -143,13 +146,13 @@ class QWorker:
                                 serialized_task = base64.b64decode(encoded_task)
                                 task = cloudpickle.loads(serialized_task)
                                 self.logger.info(
-                                    f'TASK RECEIVED: {task} with id {task_id} at {int(time.time())}'
+                                    f':: TASK RECEIVED from Publish: {task} with id {task_id} at {int(time.time())}'
                                 )
                                 try:
                                     executor = TaskExecutor(task)
                                     await executor.run()
                                     self.logger.info(
-                                        f":: TASK {task}.{task_id} Executed at {int(time.time())}"
+                                        f":: TASK {task}.{task_id} was executed at {int(time.time())}"
                                     )
                                 except Exception as e:
                                     self.logger.error(

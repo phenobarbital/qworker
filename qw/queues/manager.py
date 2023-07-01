@@ -5,8 +5,10 @@ from collections.abc import Awaitable, Callable
 import importlib
 from navconfig.logging import logging
 from flowtask.exceptions import (
+    NotFound,
     DataNotFound,
-    FileNotFound
+    FileNotFound,
+    FileError
 )
 from qw.exceptions import QWException
 from ..conf import (
@@ -142,9 +144,10 @@ class QueueManager:
                 result = await executor.run()
                 if type(result) == asyncio.TimeoutError:
                     raise
-                elif type(result) in (DataNotFound, FileNotFound):
+                elif type(result) in (NotFound, DataNotFound, FileNotFound, FileError):
                     raise
                 elif isinstance(result, BaseException):
+                    ## TODO: checking retry info from Task.
                     if task.retries < WORKER_RETRY_COUNT - 1:
                         task.add_retries()
                         self.logger.warning(

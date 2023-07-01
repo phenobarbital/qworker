@@ -29,6 +29,7 @@ from .conf import (
     WORKER_DEFAULT_PORT,
     WORKER_REDIS,
     REDIS_WORKER_STREAM,
+    REDIS_WORKER_GROUP,
     USE_DISCOVERY,
     WORKER_SECRET_KEY,
     expected_message
@@ -500,7 +501,7 @@ class QClient:
             ConnectionError: unable to connect to Worker.
             Exception: Any Unhandled error.
         """
-        self.logger.debug(
+        self.logger.info(
             f'Sending function {fn!s} to Pub/Sub Channel {REDIS_WORKER_STREAM}'
         )
         host = socket.gethostbyname(socket.gethostname())
@@ -521,11 +522,6 @@ class QClient:
             )
         serialized_task = cloudpickle.dumps(func)
         encoded_task = base64.b64encode(serialized_task).decode('utf-8')
-        # conn = aioredis.from_url(
-        #     WORKER_REDIS,
-        #     decode_responses=True,
-        #     encoding='utf-8'
-        # )
         message = {
             "uid": str(uid),
             "task": encoded_task
@@ -538,12 +534,18 @@ class QClient:
                     decode_responses=True,
                     encoding='utf-8'
             ) as conn:
-                result = await conn.xadd(REDIS_WORKER_STREAM, message)
+                self.logger.debug(
+                    f"Redis Server:  {conn}"
+                )
+                result = await conn.xadd(REDIS_WORKER_STREAM, message, nomkstream=False)
                 serialized_result = {
                     "status": "Queued",
                     "task": f"{func!r}",
                     "message": result
                 }
+                self.logger.info(
+                    f"Task {fn!r} was published to {REDIS_WORKER_GROUP}-{REDIS_WORKER_STREAM}"
+                )
                 return serialized_result
         finally:
             try:
