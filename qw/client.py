@@ -532,10 +532,16 @@ class QClient:
         }
         # check if published
         # Add the data to the stream
-        result = await conn.xadd(REDIS_WORKER_STREAM, message)
-        serialized_result = {
-            "status": "Queued",
-            "task": f"{func!r}",
-            "message": result
-        }
-        return serialized_result
+        try:
+            result = await conn.xadd(REDIS_WORKER_STREAM, message)
+            serialized_result = {
+                "status": "Queued",
+                "task": f"{func!r}",
+                "message": result
+            }
+            return serialized_result
+        finally:
+            try:
+                await conn.close()
+            except Exception:
+                pass
