@@ -521,11 +521,11 @@ class QClient:
             )
         serialized_task = cloudpickle.dumps(func)
         encoded_task = base64.b64encode(serialized_task).decode('utf-8')
-        conn = aioredis.from_url(
-            WORKER_REDIS,
-            decode_responses=True,
-            encoding='utf-8'
-        )
+        # conn = aioredis.from_url(
+        #     WORKER_REDIS,
+        #     decode_responses=True,
+        #     encoding='utf-8'
+        # )
         message = {
             "uid": str(uid),
             "task": encoded_task
@@ -533,15 +533,22 @@ class QClient:
         # check if published
         # Add the data to the stream
         try:
-            result = await conn.xadd(REDIS_WORKER_STREAM, message)
-            serialized_result = {
-                "status": "Queued",
-                "task": f"{func!r}",
-                "message": result
-            }
-            return serialized_result
+            async with aioredis.from_url(
+                    WORKER_REDIS,
+                    decode_responses=True,
+                    encoding='utf-8'
+            ) as conn:
+                result = await conn.xadd(REDIS_WORKER_STREAM, message)
+                serialized_result = {
+                    "status": "Queued",
+                    "task": f"{func!r}",
+                    "message": result
+                }
+                return serialized_result
         finally:
             try:
                 await conn.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.warning(
+                    f"Failed to disconnect Redis: {exc}"
+                )
