@@ -3,6 +3,7 @@ import os
 import time
 import socket
 import uuid
+import base64
 import asyncio
 import inspect
 import random
@@ -18,12 +19,14 @@ from qw.exceptions import (
 )
 from qw.utils import make_signature
 from redis import asyncio as aioredis
+from redis.exceptions import ResponseError
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
     expected_message,
     WORKER_SECRET_KEY,
-    REDIS_WORKER_CHANNEL,
+    REDIS_WORKER_STREAM,
+    REDIS_WORKER_GROUP,
     WORKER_REDIS
 )
 from .utils.json import json_encoder
@@ -91,17 +94,75 @@ class QWorker:
         )
         self.redis = aioredis.Redis(connection_pool=self.pool)
 
-    async def start_subscription(self):
-        """Starts PUB/SUB system based on Redis."""
+    async def ensure_group_exists(self):
         try:
-            self.pubsub = self.redis.pubsub()
-            await self.pubsub.subscribe(REDIS_WORKER_CHANNEL)
+            # Try to create the group. This will fail if the group already exists.
+            await self.redis.xgroup_create(
+                REDIS_WORKER_STREAM, REDIS_WORKER_GROUP, id='$', mkstream=True
+            )
+        except ResponseError as e:
+            if "BUSYGROUP Consumer Group name already exists" not in str(e):
+                raise
+        except Exception as exc:
+            self.logger.exception(exc, stack_info=True)
+            raise
+        try:
+            # create the consumer:
+            await self.redis.xgroup_createconsumer(
+                REDIS_WORKER_STREAM, REDIS_WORKER_GROUP, self._name
+            )
+            self.logger.debug(
+                f":: Creating Consumer {self._name} on Stream {REDIS_WORKER_STREAM}"
+            )
+        except Exception as exc:
+            print(exc)
+            self.logger.exception(exc, stack_info=True)
+            raise
 
+    async def start_subscription(self):
+        """Starts stream consumer group based on Redis."""
+        try:
+            await self.ensure_group_exists()
+            info = await self.redis.xinfo_groups(REDIS_WORKER_STREAM)
+            self.logger.debug(f'Groups Info: {info}')
             while self._running:
                 try:
-                    msg = await self.pubsub.get_message()
-                    if msg and msg['type'] == 'message':
-                        self.logger.debug(f'Received Task: {msg}')
+                    message_groups = await self.redis.xreadgroup(
+                        REDIS_WORKER_GROUP,
+                        self._name,
+                        streams={REDIS_WORKER_STREAM: '>'},
+                        block=100,
+                        count=1
+                    )
+                    for _, messages in message_groups:
+                        for _id, fn in messages:
+                            try:
+                                encoded_task = fn['task']
+                                task_id = fn['uid']
+                                # Process the task
+                                serialized_task = base64.b64decode(encoded_task)
+                                task = cloudpickle.loads(serialized_task)
+                                self.logger.info(
+                                    f'TASK RECEIVED: {task} with id {task_id} at {int(time.time())}'
+                                )
+                                try:
+                                    executor = TaskExecutor(task)
+                                    await executor.run()
+                                    self.logger.info(
+                                        f":: TASK {task}.{task_id} Executed at {int(time.time())}"
+                                    )
+                                except Exception as e:
+                                    self.logger.error(
+                                        f"Task {task}:{task_id} failed with error {e}"
+                                    )
+                                # If processing raises an exception, the next line won't be executed
+                                await self.redis.xack(
+                                    REDIS_WORKER_STREAM,
+                                    REDIS_WORKER_GROUP,
+                                    _id
+                                )
+                            except Exception as e:
+                                self.logger.error(f"Error processing message: {e}")
                     await asyncio.sleep(0.001)  # sleep a bit to prevent high CPU usage
                 except ConnectionResetError:
                     self.logger.error(
@@ -110,16 +171,14 @@ class QWorker:
                     await asyncio.sleep(1)  # Wait for a bit before trying to reconnect
                     await self.start_subscription()  # Try to restart the subscription
                 except asyncio.CancelledError:
-                    await self.pubsub.unsubscribe(REDIS_WORKER_CHANNEL)
                     break
                 except KeyboardInterrupt:
                     break
                 except Exception as exc:
                     # Handle other exceptions as necessary
                     self.logger.error(
-                        f"Error in start_subscription: {exc}"
+                        f"Error Getting Message: {exc}"
                     )
-                    break
         except Exception as exc:
             self.logger.error(
                 f"Could not establish initial connection: {exc}"
@@ -127,9 +186,11 @@ class QWorker:
 
     async def close_redis(self):
         try:
-            # Get a new pubsub object and unsubscribe from 'channel'
             try:
-                await self.pubsub.unsubscribe(REDIS_WORKER_CHANNEL)
+                # create the consumer:
+                await self.redis.xgroup_delconsumer(
+                    REDIS_WORKER_STREAM, REDIS_WORKER_GROUP, self._name
+                )
                 await asyncio.wait_for(self.redis.close(), timeout=2.0)
             except asyncio.TimeoutError:
                 self.logger.error(
@@ -483,7 +544,6 @@ class QWorker:
                     message=f'Task {task!s} was discarded, queue full',
                     writer=writer
                 )
-        print('RESULT > ', result)
         if result is None:
             # Not always a Task returns Value, sometimes returns None.
             result = [
@@ -573,6 +633,8 @@ def start_server(num_worker, host, port, debug: bool):
             loop.run_until_complete(
                 worker.shutdown()
             )
+    except Exception:
+        pass
     finally:
         if loop:
             loop.close()  # Close the event loop
