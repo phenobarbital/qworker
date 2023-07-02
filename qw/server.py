@@ -456,107 +456,13 @@ class QWorker:
             await self.closing_writer(writer, result)
             return False
 
-    async def handle_queue_wrapper(
-        self,
-        task: QueueWrapper,
-        uid: uuid.UUID,
-        writer: asyncio.StreamWriter
-    ):
-        """Handle QueueWrapper Tasks.
-        """
-        # Set Debug level of task:
-        task.debug = self.debug
-        if task.queued is True:
-            try:
-                task.id = uid
-                await self.queue.put(
-                    task, id=task.id
-                )
-                return f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
-            except asyncio.QueueFull:
-                return await self.discard_task(
-                    f"Queue in {self.name!s} is Full, discarding Task {task!r}"
-                )
-        else:
-            result = None
-            try:
-                # executed and send result to client
-                executor = TaskExecutor(task)
-                result = await executor.run()
-            except Exception as err:  # pylint: disable=W0703
-                try:
-                    result = cloudpickle.dumps(err)
-                except Exception as ex:  # pylint: disable=W0703
-                    result = cloudpickle.dumps(
-                        QWException(
-                            f'Error on Deal with Exception: {ex!s}'
-                        )
-                    )
-                await self.closing_writer(writer, result)
-                return False
-            finally:
-                return result
-
-    async def connection_handler(
-            self,
-            reader: asyncio.StreamReader,
-            writer: asyncio.StreamWriter
-    ):
-        """ Handler for Function/Task Execution.
-        receives the client request and run/queue the function.
-        Args:
-            reader: asyncio StreamReader, client information
-            writer: asyncio StreamWriter, infor to send to client.
-        Returns:
-            Task Result.
-        """
-        # # TODO: task can select which executor to use, else use default:
-        addr = writer.get_extra_info(
-            "peername"
-        )
-        # first time: check signature authentication of payload:
-        if not await self.signature_validation(reader, writer):
-            return False
-        self.logger.info(
-            f"Received Data from {addr!r} to worker {self.name!s} pid: {self._pid}"
-        )
-        # after: deserialize Task:
-        serialized_task = await self._read_task(reader)
-        task = None
-        result = None
-        task = await self.deserialize_task(
-            serialized_task, writer
-        )
-        if not task:
-            self.logger.error(f'No Task was received, received: {serialized_task}')
-            await self.closing_writer(writer, result)
-            return False
-        task_uuid = task.id if task.id else uuid.uuid1(
-            node=random.getrandbits(48) | 0x010000000000
-        )
-        if isinstance(task, QueueWrapper):
-            if not (result := await self.handle_queue_wrapper(task, task_uuid, writer)):
-                await self.closing_writer(writer, result)
-                return False
-        elif callable(task):
-            executor = TaskExecutor(task)
-            result = await executor.run()
-        else:
-            # put work in Queue:
-            try:
-                await self.queue.put(task, id=task_uuid)
-                result = f'Task {task!s} was Queued.'.encode('utf-8')
-            except asyncio.QueueFull:
-                return await self.discard_task(
-                    message=f'Task {task!s} was discarded, queue full',
-                    writer=writer
-                )
+    async def return_result(self, writer: asyncio.StreamWriter, result, task, uid):
         if result is None:
             # Not always a Task returns Value, sometimes returns None.
             result = [
                 {
                     "task": task,
-                    "uuid": task_uuid,
+                    "uuid": uid,
                     "worker": self.name
                 }
             ]
@@ -587,11 +493,111 @@ class QWorker:
             )
         await self.closing_writer(writer, result)
 
+    async def handle_queue_wrapper(
+        self,
+        task: QueueWrapper,
+        uid: uuid.UUID,
+        writer: asyncio.StreamWriter
+    ):
+        """Handle QueueWrapper Tasks.
+        """
+        # Set Debug level of task:
+        task.debug = self.debug
+        if task.queued is True:
+            try:
+                task.id = uid
+                await self.queue.put(
+                    task, id=task.id
+                )
+                result = f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
+                return await self.return_result(writer, result, task, uid)
+            except asyncio.QueueFull:
+                return await self.discard_task(
+                    f"Queue in {self.name!s} is Full, discarding Task {task!r}"
+                )
+            except asyncio.TimeoutError:
+                return await self.discard_task(
+                    f"Task {task!r} in {self.name!s} discarded due Timeout"
+                )
+        else:
+            result = None
+            try:
+                # executed and send result to client
+                executor = TaskExecutor(task)
+                result = await executor.run()
+                return await self.return_result(writer, result, task, uid)
+            except Exception as err:  # pylint: disable=W0703
+                try:
+                    result = cloudpickle.dumps(err)
+                except Exception as ex:  # pylint: disable=W0703
+                    result = cloudpickle.dumps(
+                        QWException(
+                            f'Error on Task {task!r} with Exception: {ex!s}'
+                        )
+                    )
+                await self.closing_writer(writer, result)
+
+    async def connection_handler(
+            self,
+            reader: asyncio.StreamReader,
+            writer: asyncio.StreamWriter
+    ):
+        """ Handler for Function/Task Execution.
+        receives the client request and run/queue the function.
+        Args:
+            reader: asyncio StreamReader, client information
+            writer: asyncio StreamWriter, infor to send to client.
+        Returns:
+            Task Result.
+        """
+        # # TODO: task can select which executor to use, else use default:
+        addr = writer.get_extra_info(
+            "peername"
+        )
+        # first time: check signature authentication of payload:
+        if not await self.signature_validation(reader, writer):
+            await self.closing_writer(writer, None)
+        self.logger.info(
+            f"Received Data from {addr!r} to worker {self.name!s} pid: {self._pid}"
+        )
+        # after: deserialize Task:
+        serialized_task = await self._read_task(reader)
+        task = None
+        result = None
+        task = await self.deserialize_task(
+            serialized_task, writer
+        )
+        if not task:
+            self.logger.error(f'No Task was received, received: {serialized_task}')
+            await self.closing_writer(writer, result)
+            return False
+        task_uuid = task.id if task.id else uuid.uuid1(
+            node=random.getrandbits(48) | 0x010000000000
+        )
+        if isinstance(task, QueueWrapper):
+            return await self.handle_queue_wrapper(task, task_uuid, writer)
+        elif callable(task):
+            executor = TaskExecutor(task)
+            result = await executor.run()
+            return await self.return_result(writer, result, task, task_uuid)
+        else:
+            # put work in Queue:
+            try:
+                await self.queue.put(task, id=task_uuid)
+                result = f'Task {task!s} was Queued.'.encode('utf-8')
+                return await self.return_result(writer, result, task, task_uuid)
+            except asyncio.QueueFull:
+                return await self.discard_task(
+                    message=f'Task {task!s} was discarded, queue full',
+                    writer=writer
+                )
+
     async def closing_writer(self, writer: asyncio.StreamWriter, result):
         """Sending results and closing the streamer."""
         try:
-            writer.write(result)
-            await writer.drain()
+            if result:  # Only write non-empty results
+                writer.write(result)
+                await writer.drain()
             if writer.can_write_eof():
                 writer.write_eof()
             writer.close()
