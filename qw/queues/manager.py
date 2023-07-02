@@ -135,7 +135,7 @@ class QueueManager:
         while True:
             result = None
             task = await self.queue.get()
-            self.logger.notice(
+            self.logger.info(
                 f"Task started {task} on {self.worker_name}"
             )
             ### Process Task:

@@ -15,7 +15,6 @@ import pickle
 import cloudpickle
 import jsonpickle
 import orjson
-import uvloop
 from navconfig.logging import logging
 from qw.discovery import get_client_discovery
 from qw.utils import make_signature
@@ -36,10 +35,6 @@ from .conf import (
 )
 from .process import QW_WORKER_LIST
 from .wrappers import FuncWrapper, TaskWrapper
-
-
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-uvloop.install()
 
 
 MAX_RETRY_COUNT = 5

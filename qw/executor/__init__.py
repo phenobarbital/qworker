@@ -97,7 +97,8 @@ class TaskExecutor:
                     f"Running Function: {self.task}"
                 )
                 self.task.set_loop(loop)
-                result = await self.task()
+                async with self.semaphore:
+                    result = await self.task()
             elif isinstance(self.task, TaskWrapper):
                 self.logger.info(
                     f"Running Task: {self.task}"
