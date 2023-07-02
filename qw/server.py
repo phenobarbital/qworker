@@ -164,6 +164,10 @@ class QWorker:
                                     REDIS_WORKER_GROUP,
                                     _id
                                 )
+                                self.logger.info(
+                                    f":: TASK {task} was acknowledged by Worker {self._name} \
+                                    from {REDIS_WORKER_STREAM} at {int(time.time())}"
+                                )
                             except Exception as e:
                                 self.logger.error(f"Error processing message: {e}")
                     await asyncio.sleep(0.001)  # sleep a bit to prevent high CPU usage
@@ -362,7 +366,7 @@ class QWorker:
         exc = DiscardedTask(
             message
         )
-        self.logger.critical(message, stack_info=True)
+        self.logger.error(message)
         result = cloudpickle.dumps(exc)
         await self.closing_writer(
             writer,
@@ -471,7 +475,7 @@ class QWorker:
                 return f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
             except asyncio.QueueFull:
                 return await self.discard_task(
-                    f"Worker {self.name!s} Queue is Full, discarding Task {task!r}"
+                    f"Queue in {self.name!s} is Full, discarding Task {task!r}"
                 )
         else:
             result = None
@@ -590,10 +594,6 @@ class QWorker:
             await writer.drain()
             if writer.can_write_eof():
                 writer.write_eof()
-            if self.debug is True:
-                cPrint(
-                    f"Closing client socket, pid: {self._pid}", level='DEBUG'
-                )
             writer.close()
         except Exception as e:
             self.logger.error(
