@@ -101,13 +101,11 @@ class QueueManager:
             task (QueueWrapper): an instance of QueueWrapper
         """
         try:
-            await self.queue.put(task)
+            # await self.queue.put(task)
+            asyncio.create_task(self.queue.put(task))
             await asyncio.sleep(.1)
             self.logger.info(
                 f'Task {task!s} with id {id} was queued at {int(time.time())}'
-            )
-            self.logger.debug(
-                f'QUEUE Size: {self.queue.qsize()}'
             )
             # TODO: Add broadcast event for queued task.
             return True
@@ -144,7 +142,7 @@ class QueueManager:
                 result = await executor.run()
                 if type(result) == asyncio.TimeoutError:
                     raise
-                elif type(result) in (NotFound, DataNotFound, FileNotFound, FileError):
+                elif type(result) in (NotFound, DataNotFound):
                     raise
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.
@@ -181,6 +179,3 @@ class QueueManager:
                 await self._callback(
                     task, result=result
                 )
-            self.logger.debug(
-                f'QUEUE Size after Work: {self.queue.qsize()}'
-            )

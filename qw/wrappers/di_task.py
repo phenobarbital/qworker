@@ -11,6 +11,9 @@ try:
         TaskException,
         TaskNotFound,
         TaskError,
+        FileNotFound,
+        DataNotFound,
+        NotFound,
         TaskFailed
     )
 except ImportError:
@@ -79,6 +82,12 @@ class TaskWrapper(QueueWrapper):
             )
         except TaskError:
             raise
+        except (
+            DataNotFound,
+            NotFound
+        ) as err:
+            logging.warning(err)
+            raise
         except Exception as err:
             logging.exception(err, stack_info=True)
             raise QWException(
@@ -114,13 +123,12 @@ class TaskWrapper(QueueWrapper):
     async def run(self):
         """ Running the Task in the loop."""
         result = None
-        print(f':: Starting Task {self.program}.{self.task}')
         async with self._task as task:
             try:
                 status = await task.start()
                 if not status:
                     raise TaskError(
-                        f'Error on Task: {self.program}.{self.task}'
+                        f'Error starting Task: {self.program}.{self.task}'
                     )
             except Exception as err:
                 logging.error(str(err), exc_info=True)
@@ -129,8 +137,8 @@ class TaskWrapper(QueueWrapper):
                 raise TaskFailed(
                     f"{err}"
                 ) from err
-            print(
-                f'Executing Task {self.program}.{self.task}'
+            logging.info(
+                f'Executing Task {self.program}.{self.task} with id {self.id}'
             )
             try:
                 result = await task.run()
@@ -146,6 +154,9 @@ class TaskWrapper(QueueWrapper):
 
     async def close(self):
         try:
+            logging.info(
+                f'Closing Task {self.program}.{self.task} with id {self.id}'
+            )
             if self._task:
                 await self._task.close()
                 self._task = None

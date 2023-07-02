@@ -23,13 +23,14 @@ class TaskExecutor:
     async def run_task(self):
         result = None
         self.logger.info(
-            f"Running Task: {self.task!s}"
+            f"Creating Task: {self.task!s}"
         )
         try:
-            task = asyncio.create_task(self.task())
-            task.add_done_callback(self.task_done)
+            await self.task.create()
+            # task = asyncio.create_task(self.task())
+            # task.add_done_callback(self.task_done)
             result = await asyncio.wait_for(
-                task, timeout=WORKER_TASK_TIMEOUT * 60
+                self.task.run(), timeout=WORKER_TASK_TIMEOUT * 60
             )
         except asyncio.TimeoutError:
             raise asyncio.TimeoutError(
@@ -43,12 +44,6 @@ class TaskExecutor:
         finally:
             await self.task.close()
             return result
-
-    def task_done(self, task, *args, **kwargs):
-        self.logger.info(
-            f"Finalized Task {task}"
-        )
-        return True
 
     def get_notify(self):
         # TODO: implement other notify connectors:
