@@ -154,6 +154,7 @@ class QueueManager:
                         # Wait some seconds before retrying.
                         await asyncio.sleep(WORKER_RETRY_INTERVAL)
                         await self.queue.put(task)
+                        await asyncio.sleep(0.1)
                     else:
                         cnt = WORKER_RETRY_COUNT
                         self.logger.warning(
