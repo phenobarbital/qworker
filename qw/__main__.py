@@ -13,16 +13,13 @@ from .conf import (
 )
 from .process import SpawnProcess
 from .utils import cPrint
-
+from .utils.events import enable_uvloop
 
 # warnings.simplefilter("default", ResourceWarning)
 
 def main():
     """Main Worker Function."""
-    asyncio.set_event_loop_policy(
-        uvloop.EventLoopPolicy()
-    )
-    uvloop.install()
+    enable_uvloop()
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter
     )
