@@ -6,9 +6,7 @@ import importlib
 from navconfig.logging import logging
 from flowtask.exceptions import (
     NotFound,
-    DataNotFound,
-    FileNotFound,
-    FileError
+    DataNotFound
 )
 from qw.exceptions import QWException
 from ..conf import (
@@ -101,9 +99,11 @@ class QueueManager:
             task (QueueWrapper): an instance of QueueWrapper
         """
         try:
+
             # await self.queue.put(task)
-            asyncio.create_task(self.queue.put(task))
-            await asyncio.sleep(.1)
+            self.queue.put_nowait(task)
+            # asyncio.create_task(self.queue.put(task))
+            # await asyncio.sleep(.2)
             self.logger.info(
                 f'Task {task!s} with id {id} was queued at {int(time.time())}'
             )

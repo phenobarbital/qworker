@@ -564,33 +564,38 @@ class QWorker:
         serialized_task = await self._read_task(reader)
         task = None
         result = None
-        task = await self.deserialize_task(
-            serialized_task, writer
-        )
-        if not task:
-            self.logger.error(f'No Task was received, received: {serialized_task}')
-            await self.closing_writer(writer, result)
-            return False
-        task_uuid = task.id if task.id else uuid.uuid1(
-            node=random.getrandbits(48) | 0x010000000000
-        )
-        if isinstance(task, QueueWrapper):
-            return await self.handle_queue_wrapper(task, task_uuid, writer)
-        elif callable(task):
-            executor = TaskExecutor(task)
-            result = await executor.run()
-            return await self.return_result(writer, result, task, task_uuid)
-        else:
-            # put work in Queue:
+        if (task := await self.deserialize_task(serialized_task, writer)):
             try:
-                await self.queue.put(task, id=task_uuid)
-                result = f'Task {task!s} was Queued.'.encode('utf-8')
-                return await self.return_result(writer, result, task, task_uuid)
-            except asyncio.QueueFull:
-                return await self.discard_task(
-                    message=f'Task {task!s} was discarded, queue full',
-                    writer=writer
+                loop = asyncio.get_event_loop()
+                if not task:
+                    self.logger.error(f'No Task was received, received: {serialized_task}')
+                    await self.closing_writer(writer, result)
+                    return False
+                task_uuid = task.id if task.id else uuid.uuid1(
+                    node=random.getrandbits(48) | 0x010000000000
                 )
+                if isinstance(task, QueueWrapper):
+                    return await self.handle_queue_wrapper(task, task_uuid, writer)
+                elif callable(task):
+                    executor = TaskExecutor(task)
+                    result = await executor.run()
+                    return await self.return_result(writer, result, task, task_uuid)
+                else:
+                    # put work in Queue:
+                    try:
+                        await self.queue.put(task, id=task_uuid)
+                        result = f'Task {task!s} was Queued.'.encode('utf-8')
+                        return await self.return_result(writer, result, task, task_uuid)
+                    except asyncio.QueueFull:
+                        return await self.discard_task(
+                            message=f'Task {task!s} was discarded, queue full',
+                            writer=writer
+                        )
+            except Exception as exc:
+                self.logger.exception(exc, stack_info=True)
+                result = f'Task {task!s} Error'
+                await self.closing_writer(writer, result)
+                raise
 
     async def closing_writer(self, writer: asyncio.StreamWriter, result):
         """Sending results and closing the streamer."""

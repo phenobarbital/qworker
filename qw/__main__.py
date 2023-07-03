@@ -1,8 +1,12 @@
 """Queue Worker server entry point."""
+# import os
+# import warnings
 import asyncio
 import argparse
-import uvloop
-# import warnings
+
+# os.environ['PYTHONASYNCIODEBUG'] = '1'
+# warnings.resetwarnings()
+
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -15,7 +19,6 @@ from .process import SpawnProcess
 from .utils import cPrint
 from .utils.events import enable_uvloop
 
-# warnings.simplefilter("default", ResourceWarning)
 
 def main():
     """Main Worker Function."""
@@ -83,6 +86,7 @@ def main():
             process.terminate()
     finally:
         cPrint('Shutdown all workers ...', level='WARN')
+        # print stack for all tasks
         loop.close()  # close the event loop
 
 
