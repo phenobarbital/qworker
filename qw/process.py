@@ -230,6 +230,11 @@ class SpawnProcess(object):
                 j.join()
             except TypeError as ex:
                 self.logger.error(ex)
+        ## closing discovery server:
+        try:
+            self.transport.close()
+        except Exception:
+            pass
         try:
             self.loop.run_until_complete(
                 self.remove_worker()
@@ -246,6 +251,3 @@ class SpawnProcess(object):
         except Exception as err:  # pylint: disable=W0703
             self.logger.exception(err)
             raise
-        finally:
-            if self.enable_discovery is True:
-                self.transport.close()
