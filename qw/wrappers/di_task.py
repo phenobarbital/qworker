@@ -120,6 +120,12 @@ class TaskWrapper(QueueWrapper):
         finally:
             await self.close()
 
+    def retry(self):
+        try:
+            return self._task.retry()
+        except Exception:
+            return False
+
     async def run(self):
         """ Running the Task in the loop."""
         result = None

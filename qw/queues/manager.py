@@ -6,7 +6,11 @@ import importlib
 from navconfig.logging import logging
 from flowtask.exceptions import (
     NotFound,
-    DataNotFound
+    DataNotFound,
+    FileNotFound,
+    TaskFailed,
+    TaskNotFound,
+    NotSupported
 )
 from qw.exceptions import QWException
 from ..conf import (
@@ -139,7 +143,14 @@ class QueueManager:
                 result = await executor.run()
                 if type(result) == asyncio.TimeoutError:
                     raise
-                elif type(result) in (NotFound, DataNotFound):
+                elif type(result) in (
+                    NotFound,
+                    DataNotFound,
+                    FileNotFound,
+                    TaskFailed,
+                    TaskNotFound,
+                    NotSupported
+                ):
                     raise
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.

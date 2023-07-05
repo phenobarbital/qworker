@@ -394,9 +394,6 @@ class QWorker:
         prefix = None
         try:
             prefix = await reader.readline()
-            self.logger.info(
-                f"Debug Prefix: {prefix}"
-            )
             if not prefix:
                 # if no content on payload:
                 await self.response_keepalive(writer=writer)
