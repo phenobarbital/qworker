@@ -99,11 +99,8 @@ class QueueManager:
             task (QueueWrapper): an instance of QueueWrapper
         """
         try:
-
-            # await self.queue.put(task)
             self.queue.put_nowait(task)
-            # asyncio.create_task(self.queue.put(task))
-            # await asyncio.sleep(.2)
+            await asyncio.sleep(.1)
             self.logger.info(
                 f'Task {task!s} with id {id} was queued at {int(time.time())}'
             )
