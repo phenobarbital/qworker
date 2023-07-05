@@ -6,7 +6,11 @@ import importlib
 from navconfig.logging import logging
 from flowtask.exceptions import (
     NotFound,
-    DataNotFound
+    DataNotFound,
+    FileNotFound,
+    TaskFailed,
+    TaskNotFound,
+    NotSupported
 )
 from qw.exceptions import QWException
 from ..conf import (
@@ -139,24 +143,34 @@ class QueueManager:
                 result = await executor.run()
                 if type(result) == asyncio.TimeoutError:
                     raise
-                elif type(result) in (NotFound, DataNotFound):
+                elif type(result) in (
+                    NotFound,
+                    DataNotFound,
+                    FileNotFound,
+                    TaskFailed,
+                    TaskNotFound,
+                    NotSupported
+                ):
                     raise
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.
-                    if task.retries < WORKER_RETRY_COUNT - 1:
-                        task.add_retries()
-                        self.logger.warning(
-                            f"Task {task} failed. Retrying. Retry count: {task.retries}"
-                        )
-                        # Wait some seconds before retrying.
-                        await asyncio.sleep(WORKER_RETRY_INTERVAL)
-                        await self.queue.put(task)
-                        await asyncio.sleep(0.1)
+                    if task.retry() is True:  # task was marked to retry
+                        if task.retries < WORKER_RETRY_COUNT - 1:
+                            task.add_retries()
+                            self.logger.warning(
+                                f"Task {task} failed. Retrying. Retry count: {task.retries}"
+                            )
+                            # Wait some seconds before retrying.
+                            await asyncio.sleep(WORKER_RETRY_INTERVAL)
+                            await self.queue.put(task)
+                            await asyncio.sleep(0.1)
+                        else:
+                            cnt = WORKER_RETRY_COUNT
+                            self.logger.warning(
+                                f"{task} Failed after {cnt} times. Discarding task."
+                            )
+                            raise result
                     else:
-                        cnt = WORKER_RETRY_COUNT
-                        self.logger.warning(
-                            f"{task} Failed after {cnt} times. Discarding task."
-                        )
                         raise result
                 self.logger.debug(
                     f'Consumed Task: {task} at {int(time.time())}'
