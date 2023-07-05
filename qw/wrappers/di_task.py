@@ -124,7 +124,7 @@ class TaskWrapper(QueueWrapper):
         try:
             return self._task.retry()
         except Exception:
-            return False
+            return True
 
     async def run(self):
         """ Running the Task in the loop."""
