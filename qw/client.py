@@ -467,6 +467,8 @@ class QClient:
                 await self.close(writer)
             received = cloudpickle.loads(serialized_result)
             # we dont need the result, return true
+            if isinstance(received, (QWException, asyncio.QueueFull)):
+                raise
             serialized_result = {
                 "status": "Queued",
                 "task": f"{func!r}",
@@ -477,6 +479,7 @@ class QClient:
             self.logger.exception(
                 f'Error Serializing Task: {err!s}'
             )
+            raise QWException(err)
 
     async def publish(self, fn: Any, *args, use_wrapper: bool = True, **kwargs):
         """Publish a function into a Pub/Sub Channel.
