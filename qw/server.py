@@ -374,6 +374,18 @@ class QWorker:
         )
         return False
 
+    async def queue_full(self, message: str, writer: asyncio.StreamWriter):
+        exc = asyncio.QueueFull(
+            message
+        )
+        self.logger.error(message)
+        result = cloudpickle.dumps(exc)
+        await self.closing_writer(
+            writer,
+            result
+        )
+        return False
+
     async def signature_validation(
             self,
             reader: asyncio.StreamReader,
@@ -514,13 +526,15 @@ class QWorker:
                 )
                 result = f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
                 return await self.return_result(writer, result, task, uid)
-            except asyncio.QueueFull:
-                return await self.discard_task(
-                    f"Queue in {self.name!s} is Full, discarding Task {task!r}"
+            except asyncio.QueueFull as ex:
+                return await self.queue_full(
+                    message=f"Queue in {self.name!s} is Full, discarding Task {task!r}",
+                    writer=writer
                 )
             except asyncio.TimeoutError:
                 return await self.discard_task(
-                    f"Task {task!r} in {self.name!s} discarded due Timeout"
+                    f"Task {task!r} in {self.name!s} discarded due Timeout",
+                    writer=writer
                 )
         else:
             result = None
@@ -585,9 +599,9 @@ class QWorker:
                         await self.queue.put(task, id=task_uuid)
                         result = f'Task {task!s} was Queued.'.encode('utf-8')
                         return await self.return_result(writer, result, task, task_uuid)
-                    except asyncio.QueueFull:
-                        return await self.discard_task(
-                            message=f'Task {task!s} was discarded, queue full',
+                    except asyncio.QueueFull as exc:
+                        return await self.queue_full(
+                            message=f'Queue Full, Task {task!s} was discarded',
                             writer=writer
                         )
             except Exception as exc:
