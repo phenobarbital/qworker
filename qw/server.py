@@ -382,6 +382,9 @@ class QWorker:
         prefix = None
         try:
             prefix = await reader.readline()
+            self.logger.info(
+                f"Debug Prefix: {prefix}"
+            )
             if not prefix:
                 # if no content on payload:
                 await self.response_keepalive(writer=writer)
@@ -556,7 +559,8 @@ class QWorker:
         )
         # first time: check signature authentication of payload:
         if not await self.signature_validation(reader, writer):
-            await self.closing_writer(writer, None)
+            # await self.closing_writer(writer, None)
+            return False
         self.logger.info(
             f"Received Data from {addr!r} to worker {self.name!s} pid: {self._pid}"
         )
@@ -566,11 +570,6 @@ class QWorker:
         result = None
         if (task := await self.deserialize_task(serialized_task, writer)):
             try:
-                loop = asyncio.get_event_loop()
-                if not task:
-                    self.logger.error(f'No Task was received, received: {serialized_task}')
-                    await self.closing_writer(writer, result)
-                    return False
                 task_uuid = task.id if task.id else uuid.uuid1(
                     node=random.getrandbits(48) | 0x010000000000
                 )
@@ -596,6 +595,12 @@ class QWorker:
                 result = f'Task {task!s} Error'
                 await self.closing_writer(writer, result)
                 raise
+        else:
+            self.logger.error(
+                f'No Task was received, received: {serialized_task}'
+            )
+            await self.closing_writer(writer, result)
+            return False
 
     async def closing_writer(self, writer: asyncio.StreamWriter, result):
         """Sending results and closing the streamer."""
