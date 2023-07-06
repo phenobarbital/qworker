@@ -19,7 +19,7 @@ def get_versions():
             description: list of packages and versions.
     """
     versions = {}
-    for package in PACKAGE_LIST:
+    for package in ('asyncdb', 'qw', 'querysource', 'navconfig', 'flowtask'):
         mdl = importlib.import_module(f'{package}.version', package='version')
         obj = getattr(mdl, '__version__')
         versions[package] = obj

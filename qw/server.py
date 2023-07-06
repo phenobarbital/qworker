@@ -23,11 +23,13 @@ from redis.exceptions import ResponseError
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
+    WORKER_DEFAULT_QTY,
     expected_message,
     WORKER_SECRET_KEY,
     REDIS_WORKER_STREAM,
     REDIS_WORKER_GROUP,
-    WORKER_REDIS
+    WORKER_REDIS,
+    WORKER_QUEUE_SIZE
 )
 from .utils.json import json_encoder
 from .utils.versions import get_versions
@@ -104,7 +106,9 @@ class QWorker:
             if "BUSYGROUP Consumer Group name already exists" not in str(e):
                 raise
         except Exception as exc:
-            self.logger.exception(exc, stack_info=True)
+            self.logger.exception(
+                exc, stack_info=True
+            )
             raise
         try:
             # create the consumer:
@@ -150,7 +154,9 @@ class QWorker:
                                 )
                                 try:
                                     executor = TaskExecutor(task)
-                                    await executor.run()
+                                    result = await executor.run()
+                                    if isinstance(result, BaseException):
+                                        raise result.__class__(str(result))
                                     self.logger.info(
                                         f":: TASK {task}.{task_id} was executed at {int(time.time())}"
                                     )
@@ -158,6 +164,7 @@ class QWorker:
                                     self.logger.error(
                                         f"Task {task}:{task_id} failed with error {e}"
                                     )
+                                    raise
                                 # If processing raises an exception, the next line won't be executed
                                 await self.redis.xack(
                                     REDIS_WORKER_STREAM,
@@ -326,6 +333,7 @@ class QWorker:
     async def worker_health(self, writer: asyncio.StreamWriter):
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
         status = {
+            "workers": WORKER_DEFAULT_QTY,
             "queue": {
                 "size": self.queue.size(),
                 "full": self.queue.full(),
@@ -345,12 +353,15 @@ class QWorker:
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
         status = {
             "versions": get_versions(),
+            "workers": WORKER_DEFAULT_QTY,
             "worker": {
                 "name": self.name,
                 "address": self.server_address,
-                "serving": addrs
+                "serving": addrs,
+                "redis": WORKER_REDIS
             },
             "queue": {
+                "max_size": WORKER_QUEUE_SIZE,
                 "size": self.queue.size(),
                 "full": self.queue.full(),
                 "empty": self.queue.empty(),
@@ -581,6 +592,11 @@ class QWorker:
         result = None
         if (task := await self.deserialize_task(serialized_task, writer)):
             try:
+                if isinstance(task, bytes):
+                    await self.worker_check_state(
+                        writer=writer
+                    )
+                    return False
                 task_uuid = task.id if task.id else uuid.uuid1(
                     node=random.getrandbits(48) | 0x010000000000
                 )

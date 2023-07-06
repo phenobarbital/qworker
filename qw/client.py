@@ -259,7 +259,7 @@ class QClient:
 
     async def sendto_worker(
         self,
-        func: Union[Callable, Awaitable],
+        func: Union[bytes, Callable, Awaitable],
         writer: asyncio.StreamWriter
     ):
         serialized_task = None
@@ -552,3 +552,34 @@ class QClient:
                 logging.warning(
                     f"Failed to disconnect Redis: {exc}"
                 )
+
+    async def health(self):
+        task = 'health'
+        serialized_task = task.encode('utf-8')
+        # getting writer, reader
+        reader, writer = await self.get_worker_connection()
+        # send data to worker:
+        await self.sendto_worker(serialized_task, writer=writer)
+        # asks server if task was queued:
+        try:
+            while True:
+                serialized_result = await reader.read(-1)
+                if reader.at_eof():
+                    break
+        except Exception as err:
+            raise QWException(
+                str(err)
+            ) from err
+        finally:
+            await self.close(writer)
+        task_result = None
+        try:
+            task_result = cloudpickle.loads(serialized_result)
+        except EOFError as err:
+            logging.exception(
+                f'No data was received from Server: {err!s}'
+            )
+        except Exception as err:
+            # logging.exception(f'Error receiving data from Worker Server: {err!s}')
+            task_result = orjson.loads(serialized_result)
+        return task_result
