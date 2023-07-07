@@ -1,4 +1,5 @@
 import time
+import random
 import asyncio
 from typing import Any
 import hashlib
@@ -50,7 +51,12 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
         data = data.decode('utf-8')
         logging.debug("%s:%s > %s", *(addr + (data,)))
         if data == 'list_workers':
-            data = json_encoder(self.workers).encode('utf-8')
+            try:
+                items = random.shuffle(list(self.workers.items()))
+                workers = dict(items)
+            except TypeError:
+                workers = self.workers
+            data = json_encoder(workers).encode('utf-8')
             self.transport.sendto(data, addr)
         elif data == expected_message:
             # send information Protocol:
@@ -58,8 +64,15 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
             self.transport.sendto(data, addr)
         else:
             # register a worker
+            self.logger.debug(f'Worker: {data!s}')
             try:
                 server, addr = zip(*json_decoder(data).items())
+                if server[0] in self.workers:
+                    # unregister worker:
+                    self.logger.info('::: Remove Worker :::')
+                    self.remove_worker(server[0])
+                    return
+                self.logger.info('::: Registering a Worker :::')
                 self.workers[server[0]] = tuple(addr[0])
             except JSONDecodeError as ex:
                 self.logger.error(
@@ -125,8 +138,3 @@ class QueueProtocol(asyncio.Protocol):
 
     def data_received(self, data):
         pass
-
-    # def eof_received(self):
-    #     self.logger.debug('received EOF')
-    #     if self.transport.can_write_eof():
-    #         self.transport.write_eof()

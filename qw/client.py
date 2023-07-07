@@ -41,17 +41,6 @@ MAX_RETRY_COUNT = 5
 WAIT_TIME = 0.1  # seconds
 
 
-# TODO: select a non-busy Worker
-def random_worker(workers):
-    """Picks next worker uniformly at random."""
-    while True:
-        try:
-            yield random.choice(workers)
-        except (ValueError, TypeError) as ex:
-            raise QWException(
-                "Cannot launch Work on Empty Worker List"
-            ) from ex
-
 def round_robin_worker(workers):
     """Pick next worker based on Round Robin."""
     while True:
