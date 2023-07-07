@@ -597,9 +597,14 @@ class QWorker:
                         writer=writer
                     )
                     return False
-                task_uuid = task.id if task.id else uuid.uuid1(
-                    node=random.getrandbits(48) | 0x010000000000
-                )
+                try:
+                    task_uuid = task.id if task.id else uuid.uuid1(
+                        node=random.getrandbits(48) | 0x010000000000
+                    )
+                except AttributeError:
+                    task_uuid = uuid.uuid1(
+                        node=random.getrandbits(48) | 0x010000000000
+                    )
                 if isinstance(task, QueueWrapper):
                     return await self.handle_queue_wrapper(task, task_uuid, writer)
                 elif callable(task):

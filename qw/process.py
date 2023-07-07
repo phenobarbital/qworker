@@ -8,7 +8,6 @@ import socket
 import aioredis
 from navconfig.logging import logging
 from qw.exceptions import QWException, ConfigError
-from qw.discovery import get_server_discovery
 from .utils import cPrint
 from .utils.json import json_encoder
 from .conf import (
@@ -71,11 +70,6 @@ class SpawnProcess(object):
         self.worker: str = f"{args.wkname}-{args.port}"
         self.debug: bool = args.debug
         self.redis: Callable = None
-        self.enable_discovery: bool = True
-        if args.enable_discovery == 'false':
-            self.enable_discovery: bool = False
-        self.discovery_server: Callable = None
-        self.transport: asyncio.Transport = None
         # increase the ulimit of server
         raise_nofile(value=NOFILES)
         ## Logger:
@@ -142,34 +136,34 @@ class SpawnProcess(object):
                 f"Redis connection error: {err}"
             )
             raise
-        if self.discovery_server:
-            self.discovery_server.register_worker(
-                server=self.id, addr=(self.address, self.port)
+        # self-registration into Discovery Service:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        srv_addr = ('', WORKER_DISCOVERY_PORT)
+        try:
+            sock.sendto(worker.encode(), srv_addr)
+        except socket.timeout as ex:
+            logging.error(
+                f"Unable to register Worker on this Network: {ex}"
             )
-        else:
-            # self-registration into Discovery Service:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            srv_addr = ('', WORKER_DISCOVERY_PORT)
-            try:
-                sock.sendto(worker.encode(), srv_addr)
-            except socket.timeout as ex:
-                raise QWException(
-                    "Unable to register Worker on this Network."
-                ) from ex
 
     async def remove_worker(self):
-        worker = {
+        worker = json_encoder({
             self.id: (self.address, self.port)
-        }
+        })
         conn = aioredis.Redis(connection_pool=self.redis)
         await conn.lrem(
             QW_WORKER_LIST,
             1,
-            json_encoder(worker)
+            worker
         )
-        if self.discovery_server:
-            self.discovery_server.remove_worker(
-                server=self.id
+        # adding remove capability on Worker List:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        srv_addr = ('', WORKER_DISCOVERY_PORT)
+        try:
+            sock.sendto(worker.encode(), srv_addr)
+        except socket.timeout as ex:
+            logging.error(
+                f"Unable to register Worker on this Network: {ex}"
             )
 
     def start(self):
@@ -186,17 +180,6 @@ class SpawnProcess(object):
         except Exception as err:
             self.logger.error(
                 f"Unexpected error when starting Redis: {err}"
-            )
-            raise
-        try:
-            if self.enable_discovery is True:
-                self.transport, self.discovery_server = self.loop.run_until_complete(
-                    get_server_discovery(event_loop=self.loop)
-                )
-                cPrint(':: Starting Discovery Server ::', level='WARN')
-        except asyncio.TimeoutError as err:
-            self.logger.error(
-                f"Timeout error when starting Discovery Server: {err}"
             )
             raise
         except Exception as err:
@@ -230,11 +213,6 @@ class SpawnProcess(object):
                 j.join()
             except TypeError as ex:
                 self.logger.error(ex)
-        ## closing discovery server:
-        try:
-            self.transport.close()
-        except Exception:
-            pass
         try:
             self.loop.run_until_complete(
                 self.remove_worker()
