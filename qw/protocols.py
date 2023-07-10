@@ -1,6 +1,7 @@
 import time
 import random
 import asyncio
+import redis
 from typing import Any
 import hashlib
 import socket
@@ -12,10 +13,13 @@ from qw.utils.json import json_encoder, json_decoder
 from .conf import (
     WORKER_DISCOVERY_HOST,
     WORKER_DEFAULT_MULTICAST,
+    WORKER_REDIS,
     expected_message
 )
 
+
 MULTICAST_ADDRESS = WORKER_DEFAULT_MULTICAST
+
 
 DEFAULT_HOST = WORKER_DISCOVERY_HOST
 if not DEFAULT_HOST:
@@ -30,7 +34,14 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
     def __init__(self):
         try:
             self._loop = asyncio.get_event_loop()
-            self._loop.set_debug(True)
+            params: dict = {
+                "encoding": 'utf-8',
+                "decode_responses": True,
+                "max_connections": 10
+            }
+            self._redis = redis.from_url(
+                url=WORKER_REDIS, **params
+            )
         except RuntimeError as ex:
             raise QWException(
                 f"Error getting event loop: {ex}"
@@ -51,8 +62,15 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
         data = data.decode('utf-8')
         logging.debug("%s:%s > %s", *(addr + (data,)))
         if data == 'list_workers':
+            workers = {}
+            # Get all the server info from the redis list
+            for server_info_json in self._redis.lrange(
+                'QW_SERVER_LIST', 0, -1
+            ):
+                # Deserialize the JSON string to a dictionary and update the workers
+                workers.update(json_decoder(server_info_json))
             try:
-                items = random.shuffle(list(self.workers.items()))
+                items = random.shuffle(list(workers.items()))
                 workers = dict(items)
             except TypeError:
                 workers = self.workers
@@ -64,16 +82,27 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
             self.transport.sendto(data, addr)
         else:
             # register a worker
-            self.logger.debug(f'Worker: {data!s}')
+            self.logger.debug(
+                f'Worker: {data!s}'
+            )
             try:
-                server, addr = zip(*json_decoder(data).items())
-                if server[0] in self.workers:
+                srv, addr = zip(*json_decoder(data).items())
+                address = tuple(addr[0])
+                try:
+                    server = srv[0]
+                except KeyError:
+                    server = srv
+                if server in self.workers:
                     # unregister worker:
-                    self.logger.info('::: Remove Worker :::')
-                    self.remove_worker(server[0])
+                    self.logger.info(
+                        '::: Remove Worker :::'
+                    )
+                    self.remove_worker(server, address)
                     return
-                self.logger.info('::: Registering a Worker :::')
-                self.workers[server[0]] = tuple(addr[0])
+                self.logger.info(
+                    '::: Registering a Worker :::'
+                )
+                self.register_worker(server, address)
             except JSONDecodeError as ex:
                 self.logger.error(
                     f"JSON decode error: {ex}"
@@ -89,9 +118,16 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
 
     def register_worker(self, server: str, addr: tuple):
         self.workers[server] = addr
+        # Convert the server and address to a JSON string
+        server_info = json_encoder({server: addr})
+        # Push the server info to the redis list
+        self._redis.lpush('QW_SERVER_LIST', server_info)
 
-    def remove_worker(self, server: str):
+    def remove_worker(self, server: str, addr: tuple):
         del self.workers[server]
+        server_info = json_encoder({server: addr})
+        # Remove all occurrences of this server from the redis list
+        self._redis.lrem('QW_SERVER_LIST', 1, server_info)
 
 class QueueProtocol(asyncio.Protocol):
     """Connection Protocol for QueueWorker Server."""

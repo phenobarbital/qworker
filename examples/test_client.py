@@ -40,7 +40,7 @@ if __name__ == '__main__':
     start_time = time.time()
     loop = asyncio.get_event_loop()
     top = loop.run_until_complete(
-        get_top_words(URLS, 50)
+        get_top_words(URLS, 60)
     )
     end_time = time.time() - start_time
     print(top)
