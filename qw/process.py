@@ -7,14 +7,14 @@ from collections.abc import Callable
 import socket
 import aioredis
 from navconfig.logging import logging
-from qw.exceptions import QWException, ConfigError
-from .utils import cPrint
+from qw.exceptions import ConfigError
 from .utils.json import json_encoder
 from .conf import (
     NOFILES,
     WORKER_REDIS,
     QW_WORKER_LIST,
     WORKER_DISCOVERY_PORT,
+    WORKER_USE_NAKED_IP,
     QW_MAX_WORKERS
 )
 
@@ -64,7 +64,8 @@ class SpawnProcess(object):
         except RuntimeError:
             raise
         self.host: str = args.host
-        self.address = socket.gethostbyname(socket.gethostname())
+        self.hostname = socket.gethostname()
+        self.address = socket.gethostbyname(self.hostname)
         self.id = str(uuid.uuid4())
         self.port: int = args.port
         self.worker: str = f"{args.wkname}-{args.port}"
@@ -123,8 +124,12 @@ class SpawnProcess(object):
 
     async def register_worker(self):
         try:
+            if WORKER_USE_NAKED_IP is True:
+                address = (self.address, self.port)
+            else:
+                address = (self.hostname, self.port)
             worker = json_encoder({
-                self.id: (self.address, self.port)
+                self.id: address
             })
             conn = aioredis.Redis(connection_pool=self.redis)
             await conn.lpush(
@@ -147,8 +152,12 @@ class SpawnProcess(object):
             )
 
     async def remove_worker(self):
+        if WORKER_USE_NAKED_IP is True:
+            address = (self.address, self.port)
+        else:
+            address = (self.hostname, self.port)
         worker = json_encoder({
-            self.id: (self.address, self.port)
+            self.id: address
         })
         conn = aioredis.Redis(connection_pool=self.redis)
         await conn.lrem(
@@ -180,11 +189,6 @@ class SpawnProcess(object):
         except Exception as err:
             self.logger.error(
                 f"Unexpected error when starting Redis: {err}"
-            )
-            raise
-        except Exception as err:
-            self.logger.error(
-                f"Unexpected error when starting Discovery Server: {err}"
             )
             raise
         try:
