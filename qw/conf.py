@@ -30,7 +30,7 @@ WORKER_QUEUE_CALLBACK = config.get(
 QW_WORKER_LIST = 'QW_WORKER_LIST'
 
 ## Network Discovery:
-USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=True)
+USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=False)
 WORKER_DISCOVERY_HOST = config.get('WORKER_DISCOVERY_HOST')
 WORKER_DISCOVERY_PORT = config.getint('WORKER_DISCOVERY_PORT', fallback=8434)
 WORKER_USE_NAKED_IP = config.getboolean('WORKER_USE_NAKED_IP', fallback=False)
