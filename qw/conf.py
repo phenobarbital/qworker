@@ -10,6 +10,7 @@ def get_worker_list(workers: list):
 
 ### Worker Configuration
 QW_MAX_WORKERS = config.getint('QW_MAX_WORKERS', fallback=10)
+MAX_WORKERS = config.getint('MAX_WORKERS', fallback=10)
 WORKER_DEFAULT_HOST = config.get('WORKER_DEFAULT_HOST', fallback='0.0.0.0')
 WORKER_DEFAULT_PORT = config.getint('WORKER_DEFAULT_PORT', fallback=8888)
 WORKER_DEFAULT_QTY = config.getint('WORKER_DEFAULT_QTY', fallback=4)
@@ -30,7 +31,7 @@ WORKER_QUEUE_CALLBACK = config.get(
 QW_WORKER_LIST = 'QW_WORKER_LIST'
 
 ## Network Discovery:
-USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=True)
+USE_DISCOVERY = config.getboolean('USE_DISCOVERY', fallback=False)
 WORKER_DISCOVERY_HOST = config.get('WORKER_DISCOVERY_HOST')
 WORKER_DISCOVERY_PORT = config.getint('WORKER_DISCOVERY_PORT', fallback=8434)
 WORKER_USE_NAKED_IP = config.getboolean('WORKER_USE_NAKED_IP', fallback=False)

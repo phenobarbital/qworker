@@ -10,6 +10,7 @@ from typing import Any, Union
 from collections.abc import Callable, Awaitable
 from collections import defaultdict
 from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 from redis import asyncio as aioredis
 import pickle
 import cloudpickle
@@ -31,6 +32,7 @@ from .conf import (
     REDIS_WORKER_GROUP,
     USE_DISCOVERY,
     WORKER_SECRET_KEY,
+    MAX_WORKERS,
     expected_message
 )
 from .process import QW_WORKER_LIST
@@ -78,25 +80,12 @@ class QClient:
         if worker_list:
             self._workers = worker_list
             self._worker_list = itertools.cycle(worker_list)
+        elif USE_DISCOVERY is True:
+            # get worker list from discovery:
+            self._workers, self._worker_list = get_client_discovery()
         else:
-            if USE_DISCOVERY is True:
-                # get worker list from discovery:
-                self._workers, self._worker_list = get_client_discovery()
-            else:
-                try:
-                    # starting redis:
-                    self.redis = aioredis.ConnectionPool.from_url(
-                        WORKER_REDIS,
-                        decode_responses=True,
-                        encoding='utf-8'
-                    )
-                    # getting the list from redis
-                    self._workers, self._worker_list = self.get_workers()
-                except aioredis.ConnectionError as err:
-                    self.logger.error(
-                        f"Redis connection error: {err}"
-                    )
-                    raise
+            # getting the list from redis
+            self._workers, self._worker_list = self.get_workers()
         if not self._worker_list:
             self.logger.warning(
                 'EMPTY WORKER LIST: Trying to connect to a default Worker'
@@ -111,16 +100,43 @@ class QClient:
     def discover_workers(self):
         if USE_DISCOVERY is True:
             self._workers, self._worker_list = get_client_discovery()
+        else:
+            self._workers, self._worker_list = self.get_workers()
 
     def get_workers(self):
         async def get_workers_list():
-            conn = aioredis.Redis(connection_pool=self.redis)
-            workers = []
-            if (lrange := await conn.lrange(QW_WORKER_LIST, 0, 100)):
-                w = [orjson.loads(el) for el in lrange]
-                workers = [tuple(list(v.values())[0]) for v in w]
-            return workers, itertools.cycle(workers)
-        return self._loop.run_until_complete(get_workers_list())
+            try:
+                # starting redis:
+                redis = aioredis.ConnectionPool.from_url(
+                    WORKER_REDIS,
+                    decode_responses=True,
+                    encoding='utf-8'
+                )
+                conn = aioredis.Redis(connection_pool=redis)
+                workers = []
+                if (lrange := await conn.lrange(QW_WORKER_LIST, 0, MAX_WORKERS)):
+                    w = [orjson.loads(el) for el in lrange]
+                    workers = [tuple(list(v.values())[0]) for v in w]
+                return workers, itertools.cycle(workers)
+            except aioredis.ConnectionError as err:
+                self.logger.error(
+                    f"Redis connection error: {err}"
+                )
+                raise
+            finally:
+                await redis.disconnect(inuse_connections=True)
+
+        def get_workers():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(get_workers_list())
+            finally:
+                loop.close()
+
+        executor = ThreadPoolExecutor()
+        future = executor.submit(get_workers)
+        return future.result()
 
     def get_servers(self) -> list:
         return self._workers
@@ -221,11 +237,6 @@ class QClient:
         if writer.can_write_eof():
             writer.write_eof()
         await writer.drain()
-        try:
-            if self.redis:
-                await self.redis.disconnect(inuse_connections=True)
-        except (AttributeError, ConnectionError) as err:
-            self.logger.error(err)
         self.logger.debug('Closing Socket')
         writer.close()
 
