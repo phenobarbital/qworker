@@ -48,6 +48,7 @@ WORKER_SECRET_KEY = config.get('WORKER_SECRET_KEY')
 REDIS_HOST = config.get('REDIS_HOST', fallback='localhost')
 REDIS_PORT = config.getint('REDIS_PORT', fallback=6379)
 REDIS_WORKER_DB = config.getint('REDIS_WORKER_DB', fallback=4)
+WORKER_USE_STREAMS = config.getboolean('WORKER_USE_STREAMS', fallback=True)
 REDIS_WORKER_GROUP = config.get('REDIS_WORKER_CHANNEL', fallback='QWorkerGroup')
 REDIS_WORKER_STREAM = config.get('REDIS_WORKER_STREAM', fallback='QWorkerStream')
 

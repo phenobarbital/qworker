@@ -499,8 +499,12 @@ class QClient:
             ConnectionError: unable to connect to Worker.
             Exception: Any Unhandled error.
         """
+        try:
+            worker_stream = kwargs.pop('stream', REDIS_WORKER_STREAM)
+        except (ValueError, KeyError):
+            worker_stream = REDIS_WORKER_STREAM
         self.logger.info(
-            f'Sending function {fn!s} to Pub/Sub Channel {REDIS_WORKER_STREAM}'
+            f'Sending function {fn!s} to Pub/Sub Channel {worker_stream}'
         )
         host = socket.gethostbyname(socket.gethostname())
         # serializing
@@ -535,14 +539,14 @@ class QClient:
                 self.logger.debug(
                     f"Redis Server:  {conn}"
                 )
-                result = await conn.xadd(REDIS_WORKER_STREAM, message, nomkstream=False)
+                result = await conn.xadd(worker_stream, message, nomkstream=False)
                 serialized_result = {
                     "status": "Queued",
                     "task": f"{func!r}",
                     "message": result
                 }
                 self.logger.info(
-                    f"Task {fn!r} was published to {REDIS_WORKER_GROUP}-{REDIS_WORKER_STREAM}"
+                    f"Task {fn!r} was published to {REDIS_WORKER_GROUP}-{worker_stream}"
                 )
                 return serialized_result
         finally:

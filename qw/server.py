@@ -28,6 +28,7 @@ from .conf import (
     WORKER_SECRET_KEY,
     REDIS_WORKER_STREAM,
     REDIS_WORKER_GROUP,
+    WORKER_USE_STREAMS,
     WORKER_REDIS,
     WORKER_QUEUE_SIZE
 )
@@ -111,20 +112,22 @@ class QWorker:
             )
             raise
         try:
-            # create the consumer:
-            await self.redis.xgroup_createconsumer(
-                REDIS_WORKER_STREAM, REDIS_WORKER_GROUP, self._name
-            )
-            self.logger.debug(
-                f":: Creating Consumer {self._name} on Stream {REDIS_WORKER_STREAM}"
-            )
+            if WORKER_USE_STREAMS is True:
+                # create the consumer:
+                await self.redis.xgroup_createconsumer(
+                    REDIS_WORKER_STREAM, REDIS_WORKER_GROUP, self._name
+                )
+                self.logger.debug(
+                    f":: Creating Consumer {self._name} on Stream {REDIS_WORKER_STREAM}"
+                )
         except Exception as exc:
-            print(exc)
             self.logger.exception(exc, stack_info=True)
             raise
 
     async def start_subscription(self):
         """Starts stream consumer group based on Redis."""
+        if WORKER_USE_STREAMS is False:
+            return
         try:
             await self.ensure_group_exists()
             info = await self.redis.xinfo_groups(REDIS_WORKER_STREAM)
