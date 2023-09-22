@@ -20,7 +20,7 @@ except ImportError:
     logging.warning(
         "Unable to Load FlowTask Task Component, we can't send Tasks to any Worker."
     )
-from qw.exceptions import QWException
+from ..exceptions import QWException
 from .base import QueueWrapper
 
 class TaskWrapper(QueueWrapper):
