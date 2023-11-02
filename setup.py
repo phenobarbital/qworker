@@ -110,7 +110,7 @@ setup(
         'aiofile==3.8.8',
         'beautifulsoup4==4.12.2',
         'async-timeout==4.0.2',
-        'msgpack==1.0.5',
+        'msgpack==1.0.7',
     ],
     ext_modules=cythonize(extensions),
     entry_points={
