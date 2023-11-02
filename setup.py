@@ -109,7 +109,7 @@ setup(
         'jsonpickle==3.0.2',
         'aiofile==3.8.8',
         'beautifulsoup4==4.12.2',
-        'async-timeout==4.0.2',
+        'async-timeout==4.0.3',
         'msgpack==1.0.5',
     ],
     ext_modules=cythonize(extensions),
