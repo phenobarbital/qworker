@@ -487,7 +487,7 @@ class QWorker:
             # Not always a Task returns Value, sometimes returns None.
             result = [
                 {
-                    "task": task,
+                    "task": f"{task!r}",
                     "uuid": uid,
                     "worker": self.name
                 }

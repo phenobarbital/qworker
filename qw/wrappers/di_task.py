@@ -12,6 +12,7 @@ try:
         TaskNotFound,
         TaskError,
         FileNotFound,
+        EmptyFile,
         DataNotFound,
         NotFound,
         TaskFailed
@@ -82,17 +83,20 @@ class TaskWrapper(QueueWrapper):
             )
         except TaskError:
             raise
+        except (FileNotFound, EmptyFile) as exc:
+            logging.warning(exc)
+            raise
         except (
             DataNotFound,
             NotFound
-        ) as err:
-            logging.warning(err)
+        ) as exc:
+            logging.warning(exc)
             raise
-        except Exception as err:
-            logging.exception(err, stack_info=True)
+        except Exception as exc:
+            logging.exception(exc, stack_info=True)
             raise QWException(
-                f"{err}"
-            ) from err
+                f"{exc}"
+            ) from exc
 
     def __await__(self):
         return self.__call__().__await__()

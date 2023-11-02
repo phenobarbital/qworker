@@ -104,6 +104,7 @@ setup(
         'ciso8601>=2.2.0',
         'navconfig[default]>=1.4.0',
         'asyncdb[default]>=2.5.6',
+        'async-notify[default]>=1.1.5',
         'cloudpickle==3.0.0',
         'jsonpickle==3.0.2',
         'aiofile==3.8.8',

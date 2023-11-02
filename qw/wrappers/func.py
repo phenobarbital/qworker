@@ -9,6 +9,7 @@ class FuncWrapper(QueueWrapper):
     def __init__(self, host, func, *args, **kwargs):
         super(FuncWrapper, self).__init__(*args, **kwargs)
         self.host = host
+        self._retry = None
         self.func, self.args, self.kwargs = func, args, kwargs
 
     async def __call__(self):
@@ -30,3 +31,9 @@ class FuncWrapper(QueueWrapper):
 
     def __str__(self):
         return '<%s> from %s' % (self.func.__name__, self.host)  # pylint: disable=C0209
+
+    def retry(self):
+        try:
+            return self._retry
+        except Exception:
+            return True

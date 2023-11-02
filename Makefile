@@ -6,7 +6,7 @@ install:
 	pip install -e .
 
 develop:
-	pip install wheel==0.38.4
+	pip install wheel==0.40.0
 	pip install -e .
 	pip install -Ur docs/requirements-dev.txt
 	flit install --symlink
