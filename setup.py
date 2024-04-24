@@ -98,11 +98,10 @@ setup(
     packages=find_packages(exclude=["contrib", "docs", "tests", "settings"]),
     setup_requires=[
         'wheel==0.42.0',
-        'Cython==3.0.6'
+        'Cython==3.0.9'
     ],
     install_requires=[
         'asyncio==3.4.3',
-        'uvloop==0.19.0',
         'ciso8601>=2.2.0',
         'navconfig[default]>=1.5.0',
         'asyncdb[default]>=2.6.0',
