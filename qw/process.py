@@ -5,7 +5,7 @@ import resource as res
 import subprocess
 from collections.abc import Callable
 import socket
-import aioredis
+from redis import asyncio as aioredis
 from navconfig.logging import logging
 from qw.exceptions import ConfigError
 from .utils.json import json_encoder
