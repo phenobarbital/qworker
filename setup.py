@@ -107,7 +107,7 @@ setup(
         'asyncdb[default]>=2.6.0',
         'cloudpickle==3.0.0',
         'jsonpickle==3.0.2',
-        'beautifulsoup4==4.12.2',
+        'beautifulsoup4>=4.12.3',
         'async-timeout==4.0.3',
         'msgpack==1.0.5',
     ],
