@@ -97,16 +97,17 @@ setup(
     author_email='jesuslara@phenobarbital.info',
     packages=find_packages(exclude=["contrib", "docs", "tests", "settings"]),
     setup_requires=[
-        'wheel==0.42.0',
-        'Cython==3.0.9'
+        'setuptools==74.0.0',
+        'Cython==3.0.11',
+        'wheel==0.44.0',
     ],
     install_requires=[
         'asyncio==3.4.3',
         'ciso8601>=2.2.0',
-        'navconfig[default]>=1.5.0',
-        'asyncdb[default]>=2.6.0',
-        'cloudpickle==3.0.0',
-        'jsonpickle==3.0.2',
+        'navconfig[default]>=1.7.0',
+        'asyncdb[default]>=2.8.0',
+        'cloudpickle>=3.0.0',
+        'jsonpickle>=3.0.2',
         'beautifulsoup4>=4.12.3',
         'async-timeout==4.0.3',
         'msgpack==1.0.5',
