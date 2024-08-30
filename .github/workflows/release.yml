@@ -18,14 +18,8 @@ jobs:
     - name: Build manylinux Python wheels
       uses: RalfG/python-wheels-manylinux-build@v0.5.0-manylinux2014_x86_64
       with:
-        python-versions: 'cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311'
+        python-versions: 'cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312'
         build-requirements: 'cython numpy'
-    - name: Publish wheels to Test PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.QWORKER_TEST }}
-      run: |
-        twine upload -r testpypi dist/*-manylinux*.whl
     - name: Publish wheels to Production PyPI
       env:
         TWINE_USERNAME: __token__
