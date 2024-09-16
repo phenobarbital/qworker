@@ -69,6 +69,10 @@ PACKAGE_LIST = config.getlist(
     'PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig')
 )
 
+## Telegram:
+# Telegram credentials
+TELEGRAM_BOT_TOKEN = config.get("TELEGRAM_BOT_TOKEN")
+
 try:
     from settings.settings import (
         WORKER_LIST,
