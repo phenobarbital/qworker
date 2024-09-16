@@ -38,7 +38,7 @@ class JiraBot(TelegramBot):
 async def main():
     bot = JiraBot()
     bot.setup()  # Register the command handlers
-    await bot.start_polling()
+    await bot.run_forever()
 
 
 if __name__ == "__main__":

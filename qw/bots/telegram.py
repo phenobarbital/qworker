@@ -116,7 +116,7 @@ class TelegramBot(ABC):
                     Command(command_name)
                 )
 
-    async def start_polling(self) -> None:
+    async def run_forever(self) -> None:
         # And the run events dispatching
         if not self.bot:
             self.setup()
