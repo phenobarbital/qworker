@@ -1,17 +1,23 @@
 from abc import ABC
 from collections.abc import Awaitable, Callable
-from typing import Any, Optional
+from typing import Any, Optional, Union
+import asyncio
 import inspect
-from aiogram import Bot, Dispatcher, html
+from functools import partial
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    ProcessPoolExecutor
+)
+from aiogram import Bot, Dispatcher
 from aiogram import types
 from aiogram import md
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.client.default import DefaultBotProperties
+from aiogram.client.default import DefaultBotProperties  # type: ignore
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import Command
 from aiogram.types import Message
-from navconfig.logging import logging
+from navconfig.logging import logging  # type: ignore
 from qw.conf import (
     TELEGRAM_BOT_TOKEN
 )
@@ -38,8 +44,18 @@ class TelegramBot(ABC):
             'parse_mode',
             ParseMode.HTML
         )
+        # Start message:
+        self._start_message: str = kwargs.get(
+            'start_message',
+            "Ready to assist you!"
+        )
         # logger
         self.logger = logging.getLogger(name='QW.TelegramBot')
+        # Executor:
+        self._executor = self.get_executor(
+            executor=kwargs.get('executor', 'thread'),
+            max_workers=kwargs.get('max_workers', 2)
+        )
 
     def user_info(self, message: Message) -> dict:
         try:
@@ -83,7 +99,7 @@ class TelegramBot(ABC):
                 allow_sending_without_reply=True
             )
         }
-        self.bot = Bot(
+        self.bot = Bot(  # pylint: disable=E1123
             token=self._token,
             **bot_settings
         )
@@ -95,7 +111,10 @@ class TelegramBot(ABC):
                 # Extract command name by removing 'handler_' prefix
                 command_name = name.replace('handler_', '')
                 # Register the method as a command handler
-                self._dispatcher.message.register(method, Command(command_name))
+                self._dispatcher.message.register(
+                    method,
+                    Command(command_name)
+                )
 
     async def start_polling(self) -> None:
         # And the run events dispatching
@@ -116,6 +135,42 @@ class TelegramBot(ABC):
         # Getting Bot info:
         self.bot_info = await self.bot.get_me()
         self.logger.debug(
-            f"🤖 Hello, I'm {self.bot_info.first_name}.\nHave a nice Day!"
+            f"🤖 Hello, I'm {self.bot_info.first_name}.\n{self._start_message}"
         )
         await self._dispatcher.start_polling(self.bot)
+
+    def get_executor(self, executor: str = None, max_workers: int = 2) -> Any:
+        if executor == "thread":
+            return ThreadPoolExecutor(
+                max_workers=max_workers
+            )
+        elif executor == "process":
+            return ProcessPoolExecutor(
+                max_workers=max_workers
+            )
+        elif self._executor is not None:
+            return self._executor
+        else:
+            return None
+
+    async def run_in_thread(
+        self,
+        fn: Union[Callable, Awaitable],
+        *args,
+        executor: Any = None,
+        **kwargs
+    ):
+        """_execute.
+
+        Returns a future to be executed into a Thread Pool.
+        """
+        loop = asyncio.get_event_loop()
+        func = partial(fn, *args, **kwargs)
+        if not executor:
+            executor = self._executor
+        try:
+            fut = loop.run_in_executor(executor, func)
+            return await fut
+        except Exception as e:
+            self.logger.exception(e, stack_info=True)
+            raise
