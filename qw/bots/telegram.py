@@ -8,6 +8,7 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     ProcessPoolExecutor
 )
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram import types
 from aiogram import md
@@ -40,22 +41,33 @@ class TelegramBot(ABC):
         self._token = bot_token if bot_token else TELEGRAM_BOT_TOKEN
         self._dispatcher: Awaitable = None
         self.bot: Callable = None
-        self.parse_mode = kwargs.get(
+        self.parse_mode = kwargs.pop(
             'parse_mode',
             ParseMode.HTML
         )
         # Start message:
-        self._start_message: str = kwargs.get(
+        self._start_message: str = kwargs.pop(
             'start_message',
             "Ready to assist you!"
         )
         # logger
-        self.logger = logging.getLogger(name='QW.TelegramBot')
+        self.logger = logging.getLogger(
+            name='QW.TelegramBot'
+        )
         # Executor:
         self._executor = self.get_executor(
-            executor=kwargs.get('executor', 'thread'),
-            max_workers=kwargs.get('max_workers', 2)
+            executor=kwargs.pop('executor', 'thread'),
+            max_workers=kwargs.pop('max_workers', 2)
         )
+        # Support webhook:
+        self.use_webhook: bool = kwargs.pop('use_webhook', False)
+        self._webook_url: str = kwargs.pop('webhook_url', None)
+        self._webhook_route: str = kwargs.pop(
+            'webhook_route',
+            '/bot/webhook'
+        )
+        # other arguments:
+        self.kwargs = kwargs
 
     def user_info(self, message: Message) -> dict:
         try:
@@ -86,10 +98,18 @@ class TelegramBot(ABC):
         safe_text = text
         if self.parse_mode == ParseMode.MARKDOWN_V2:
             safe_text = md.quote(safe_text)
-            return message.answer(safe_text, parse_mod=ParseMode.MARKDOWN_V2)
+            return message.answer(
+                safe_text,
+                parse_mod=ParseMode.MARKDOWN_V2
+            )
         return message.answer(safe_text)
 
-    def setup(self):
+    async def handle_webhook(self, request: web.Request):
+        update = await request.json()
+        await self._dispatcher.feed_update(self.bot, types.Update(**update))
+        return web.Response(text='OK')
+
+    def setup(self, app: Optional[web.Application] = None):
         self._session = AiohttpSession()
         bot_settings = {
             "session": self._session,
@@ -97,7 +117,9 @@ class TelegramBot(ABC):
                 parse_mode=self.parse_mode,
                 disable_notification=True,
                 allow_sending_without_reply=True
-            )
+            ),
+            "request_timeout": 10,
+            **self.kwargs
         }
         self.bot = Bot(  # pylint: disable=E1123
             token=self._token,
@@ -115,6 +137,20 @@ class TelegramBot(ABC):
                     method,
                     Command(command_name)
                 )
+        if app:
+            if self.use_webhook is True:
+                app['telegram_bot'] = self
+                app.router.add_post(
+                    self._webhook_route,
+                    self.handle_webhook
+                )
+                # added to on_startup:
+                app.on_startup.append(self.on_startup)
+
+    async def on_startup(self, app: web.Application):
+        if self.use_webhook is True:
+            await self.bot.set_webhook(self._webook_url)
+            print(f"Webhook set to: {self._webook_url}")
 
     async def run_forever(self) -> None:
         # And the run events dispatching
@@ -124,7 +160,9 @@ class TelegramBot(ABC):
             # Check if there is an active webhook
             webhook_info = await self.bot.get_webhook_info()
             if webhook_info.url:
-                print(f"Webhook is currently set to: {webhook_info.url}")
+                print(
+                    f"Webhook is currently set to: {webhook_info.url}"
+                )
                 # Delete the webhook if it exists
                 await self.bot.delete_webhook()
                 print("Webhook deleted to enable polling mode.")
