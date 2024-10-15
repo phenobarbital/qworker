@@ -71,6 +71,7 @@ class SpawnProcess:
         self.port: int = args.port
         self.worker: str = f"{args.wkname}-{args.port}"
         self.debug: bool = args.debug
+        self._enable_notify: bool = args.enable_notify
         self.redis: Callable = None
         # increase the ulimit of server
         raise_nofile(value=NOFILES)
@@ -101,26 +102,27 @@ class SpawnProcess:
                 )
                 raise
         # Starts a NotifyWorker Process:
-        try:
-            _name = f'NotifyWorker_{self.id}'
-            notify_process = mp.Process(
-                target=self.start_notify_worker,
-                name=_name,
-                args=(
-                    args.notify_host,
-                    args.notify_port,
-                    args.debug,
-                    _name,
-                    args.notify_empty,
+        if self._enable_notify is True:
+            try:
+                _name = f'NotifyWorker_{self.id}'
+                notify_process = mp.Process(
+                    target=self.start_notify_worker,
+                    name=_name,
+                    args=(
+                        args.notify_host,
+                        args.notify_port,
+                        args.debug,
+                        _name,
+                        args.notify_empty,
+                    )
                 )
-            )
-            JOB_LIST.append(notify_process)
-            notify_process.start()
-        except (OSError, IOError) as ex:
-            self.logger.error(
-                f"Error Starting Notify Worker: {ex}"
-            )
-            raise
+                JOB_LIST.append(notify_process)
+                notify_process.start()
+            except (OSError, IOError) as ex:
+                self.logger.error(
+                    f"Error Starting Notify Worker: {ex}"
+                )
+                raise
 
     def start_notify_worker(
         self,

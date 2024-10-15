@@ -74,6 +74,11 @@ def main():
         help='UDP Port for Service discovery'
     )
     parser.add_argument(
+        '--enable_notify', action="store_true",
+        default=True,
+        help="Enable Notify Worker."
+    )
+    parser.add_argument(
         '--notify_empty', action="store_true",
         default=False,
         help="Notify when Redis Stream is Empty."
