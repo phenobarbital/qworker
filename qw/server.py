@@ -7,9 +7,12 @@ import base64
 import asyncio
 import inspect
 import random
-from typing import Any
-from collections.abc import Callable
+import datetime
+from typing import Any, Union, Optional
+from collections.abc import Callable, Awaitable
 import multiprocessing as mp
+from redis import asyncio as aioredis
+from redis.exceptions import ResponseError
 import cloudpickle
 from navconfig.logging import logging
 from qw.exceptions import (
@@ -17,9 +20,7 @@ from qw.exceptions import (
     ParserError,
     DiscardedTask
 )
-from qw.utils import make_signature
-from redis import asyncio as aioredis
-from redis.exceptions import ResponseError
+from .utils import cPrint, make_signature
 from .conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
@@ -34,7 +35,6 @@ from .conf import (
 )
 from .utils.json import json_encoder
 from .utils.versions import get_versions
-from .utils import cPrint
 from .queues import QueueManager
 from .wrappers import (
     QueueWrapper
@@ -55,6 +55,8 @@ class QWorker:
         loop: Event loop to run in.
         task_executor: Executor that will run tasks from clients.
     """
+    send_notification: Optional[Union[Callable, Awaitable]] = None
+
     def __init__(
             self,
             host: str = DEFAULT_HOST,
@@ -63,7 +65,9 @@ class QWorker:
             name: str = '',
             event_loop: asyncio.AbstractEventLoop = None,
             debug: bool = False,
-            protocol: Any = None
+            protocol: Any = None,
+            notify_empty_stream: bool = False,
+            empty_stream_minutes: int = 5
     ):
         self.host = host
         self.port = port
@@ -71,6 +75,8 @@ class QWorker:
         self.queue = None
         self._id = worker_id
         self._running: bool = True
+        self._notify_empty_stream = notify_empty_stream
+        self._empty_stream_minutes = empty_stream_minutes
         if name:
             self._name = name
         else:
@@ -87,6 +93,24 @@ class QWorker:
     @property
     def name(self):
         return self._name
+
+    async def cleanup_old_messages(self):
+        """Removes messages older than 7 days from the stream."""
+        try:
+            # Calculate the timestamp for 7 days ago
+            seven_days_ago = int((time.time() - 7 * 24 * 60 * 60) * 1000)
+            # Convert it to a Redis Stream ID format (timestamp-part-sequence)
+            seven_days_ago_id = f"{seven_days_ago}-0"
+            # Use XTRIM with minid to remove messages older than the calculated timestamp
+            await self.redis.xtrim(REDIS_WORKER_STREAM, minid=seven_days_ago_id)
+            self.logger.info(
+                f"Cleaned up old messages from stream {REDIS_WORKER_STREAM}"
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error cleaning up old messages: {e}"
+            )
 
     def start_redis(self):
         self.pool = aioredis.ConnectionPool.from_url(
@@ -124,6 +148,51 @@ class QWorker:
             self.logger.exception(exc, stack_info=True)
             raise
 
+    async def check_stream_empty(self):
+        """Checks if the stream is empty and sends a notification if it is."""
+        while self._running:
+            try:
+                # Get the last message ID in the stream
+                last_id = await self.redis.xrevrange(REDIS_WORKER_STREAM, count=1)
+
+                if not last_id:
+                    # Stream is empty, set a safe last message time far in the past
+                    last_message_time = 0
+                else:
+                    # Extract the timestamp from the message ID
+                    last_message_time = int(last_id[0][0].split('-')[0])
+
+                # Get the current time in milliseconds
+                current_time_ms = time.time() * 1000
+
+                # Check if the stream has ever had messages to avoid huge numbers
+                if last_message_time > 0:
+                    # Calculate the time difference in minutes
+                    time_diff_minutes = (current_time_ms - last_message_time) / 60000
+                else:
+                    # Indicate that the stream is empty and has no messages
+                    time_diff_minutes = float('inf')
+
+                if time_diff_minutes > self._empty_stream_minutes:
+                    msg = f"Stream {REDIS_WORKER_STREAM} has been empty for {time_diff_minutes:.2f} minutes."
+                    self.logger.warning(msg)
+                    # TODO: Send log or email notification here
+                    if callable(self.send_notification):
+                        if asyncio.iscoroutinefunction(self.send_notification):
+                            await self.send_notification(  # pylint: disable=E1102 # noqa
+                                msg
+                            )
+                        else:
+                            self.send_notification(  # pylint: disable=E1102 # noqa
+                                msg
+                            )
+                # Check for emptyness every minute
+                await asyncio.sleep(60)
+
+            except Exception as e:
+                self.logger.error(f"Error checking stream: {e}")
+                await asyncio.sleep(60)  # Wait a minute before trying again
+
     async def start_subscription(self):
         """Starts stream consumer group based on Redis."""
         if WORKER_USE_STREAMS is False:
@@ -135,6 +204,16 @@ class QWorker:
             self.logger.debug(
                 f"Redis Server: {self.redis}"
             )
+
+            # Clean up old messages before starting
+            await self.cleanup_old_messages()
+
+            if self._notify_empty_stream is True:
+                # Start the empty stream checker task if enabled
+                self.empty_stream_checker_task = asyncio.create_task(
+                    self.check_stream_empty()
+                )
+
             while self._running:
                 try:
                     message_groups = await self.redis.xreadgroup(
@@ -203,6 +282,12 @@ class QWorker:
 
     async def close_redis(self):
         try:
+            if self._notify_empty_stream is True:
+                try:
+                    self.empty_stream_checker_task.cancel()
+                    await self.empty_stream_checker_task
+                except asyncio.CancelledError:
+                    pass
             try:
                 # create the consumer:
                 await self.redis.xgroup_delconsumer(
