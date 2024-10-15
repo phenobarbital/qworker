@@ -7,7 +7,8 @@ from collections.abc import Callable
 import socket
 from redis import asyncio as aioredis
 from navconfig.logging import logging
-from qw.exceptions import ConfigError
+from notify.server import NotifyWorker
+from .exceptions import ConfigError
 from .utils.json import json_encoder
 from .conf import (
     NOFILES,
@@ -57,7 +58,7 @@ def is_port_available(host, port):
     except OSError:
         return False
 
-class SpawnProcess(object):
+class SpawnProcess:
     def __init__(self, args):
         try:
             self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
@@ -90,7 +91,7 @@ class SpawnProcess(object):
                 p = mp.Process(
                     target=start_server,
                     name=f'{self.worker}_{i}',
-                    args=(i, args.host, args.port, args.debug, )
+                    args=(i, args.host, args.port, args.debug, args.notify_empty, )
                 )
                 JOB_LIST.append(p)
                 p.start()
@@ -99,6 +100,52 @@ class SpawnProcess(object):
                     f"Error Dispatching Worker: {ex}"
                 )
                 raise
+        # Starts a NotifyWorker Process:
+        try:
+            _name = f'NotifyWorker_{self.id}'
+            notify_process = mp.Process(
+                target=self.start_notify_worker,
+                name=_name,
+                args=(
+                    args.notify_host,
+                    args.notify_port,
+                    args.debug,
+                    _name,
+                    args.notify_empty,
+                )
+            )
+            JOB_LIST.append(notify_process)
+            notify_process.start()
+        except (OSError, IOError) as ex:
+            self.logger.error(
+                f"Error Starting Notify Worker: {ex}"
+            )
+            raise
+
+    def start_notify_worker(
+        self,
+        host: str,
+        port: str,
+        debug: bool,
+        name: str,
+        notify_empty: bool
+    ):
+        """Function to start NotifyWorker in a separate process."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        notify_worker = NotifyWorker(
+            host=host,
+            port=port,
+            debug=debug,
+            name=name,
+            notify_empty_stream=notify_empty
+        )
+        try:
+            loop.run_until_complete(notify_worker.start())
+        except KeyboardInterrupt:
+            loop.run_until_complete(notify_worker.stop())
+        finally:
+            loop.close()
 
     async def start_redis(self):
         # starting redis:

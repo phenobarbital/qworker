@@ -37,6 +37,16 @@ def main():
         help='set server port'
     )
     parser.add_argument(
+        '--notify_host', dest='notify_host', type=str,
+        default=WORKER_DEFAULT_HOST,
+        help='Set Notify host'
+    )
+    parser.add_argument(
+        '--notify_port', dest='notify_port', type=int,
+        default=WORKER_DEFAULT_PORT,
+        help='Set Notify Port'
+    )
+    parser.add_argument(
         '--workers', dest='workers', type=int,
         default=WORKER_DEFAULT_QTY,
         help='max number of workers'
@@ -62,6 +72,11 @@ def main():
         '--discovery', dest='discovery', type=str,
         default=WORKER_DISCOVERY_PORT,
         help='UDP Port for Service discovery'
+    )
+    parser.add_argument(
+        '--notify_empty', action="store_true",
+        default=False,
+        help="Notify when Redis Stream is Empty."
     )
     parser.add_argument(
         '--debug', action="store_true",

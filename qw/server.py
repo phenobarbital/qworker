@@ -12,7 +12,7 @@ from typing import Any, Union, Optional
 from collections.abc import Callable, Awaitable
 import multiprocessing as mp
 from redis import asyncio as aioredis
-from redis.exceptions import ResponseError
+from redis.exceptions import ResponseError, ConnectionError
 import cloudpickle
 from navconfig.logging import logging
 from qw.exceptions import (
@@ -258,7 +258,9 @@ class QWorker:
                                     from {REDIS_WORKER_STREAM} at {int(time.time())}"
                                 )
                             except Exception as e:
-                                self.logger.error(f"Error processing message: {e}")
+                                self.logger.error(
+                                    f"Error processing message: {e}"
+                                )
                     await asyncio.sleep(0.001)  # sleep a bit to prevent high CPU usage
                 except ConnectionResetError:
                     self.logger.error(
@@ -266,9 +268,7 @@ class QWorker:
                     )
                     await asyncio.sleep(1)  # Wait for a bit before trying to reconnect
                     await self.start_subscription()  # Try to restart the subscription
-                except asyncio.CancelledError:
-                    break
-                except KeyboardInterrupt:
+                except (asyncio.CancelledError, ConnectionError, KeyboardInterrupt):
                     break
                 except Exception as exc:
                     # Handle other exceptions as necessary
@@ -738,7 +738,7 @@ class QWorker:
 
 
 ### Start Server ###
-def start_server(num_worker, host, port, debug: bool):
+def start_server(num_worker, host, port, debug: bool, notify_empty: bool):
     """thread worker function"""
     loop = None
     worker = None
@@ -755,7 +755,8 @@ def start_server(num_worker, host, port, debug: bool):
             port=port,
             event_loop=loop,
             debug=debug,
-            worker_id=num_worker
+            worker_id=num_worker,
+            notify_empty_stream=notify_empty
         )
         loop.run_until_complete(
             worker.start()
