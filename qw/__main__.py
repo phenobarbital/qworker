@@ -7,9 +7,10 @@ import argparse
 # os.environ['PYTHONASYNCIODEBUG'] = '1'
 # warnings.resetwarnings()
 
-from .conf import (
+from qw.conf import (
     WORKER_DEFAULT_HOST,
     WORKER_DEFAULT_PORT,
+    NOTIFY_DEFAULT_PORT,
     WORKER_DEFAULT_QTY,
     WORKER_QUEUE_SIZE,
     WORKER_DISCOVERY_PORT
@@ -43,7 +44,7 @@ def main():
     )
     parser.add_argument(
         '--notify_port', dest='notify_port', type=int,
-        default=WORKER_DEFAULT_PORT,
+        default=NOTIFY_DEFAULT_PORT,
         help='Set Notify Port'
     )
     parser.add_argument(
