@@ -1,4 +1,4 @@
-from navconfig import config
+from navconfig import config, ENVIRONMENT, ENV
 
 def get_worker_list(workers: list):
     """Convert a list of workers in a tuple of worker:port for Scheduler."""
@@ -7,6 +7,7 @@ def get_worker_list(workers: list):
         w, p = worker.split(':')
         wl.append((w, p))
     return wl
+
 
 ### Worker Configuration
 QW_MAX_WORKERS = config.getint('QW_MAX_WORKERS', fallback=10)
@@ -73,6 +74,10 @@ PACKAGE_LIST = config.getlist(
 ## Telegram:
 # Telegram credentials
 TELEGRAM_BOT_TOKEN = config.get("TELEGRAM_BOT_TOKEN")
+# Worker notifications:
+TELEGRAM_CHAT_ID = config.get("TELEGRAM_CHAT_ID")
+EVENT_CHAT_BOT = config.get("EVENT_CHAT_BOT", fallback=TELEGRAM_BOT_TOKEN)
+EVENT_CHAT_ID = config.get("EVENT_CHAT_ID", fallback=TELEGRAM_CHAT_ID)
 
 try:
     from settings.settings import (

@@ -17,32 +17,21 @@ try:
         NotFound,
         TaskFailed
     )
-except ImportError:
+except ImportError as exc:
     logging.warning(
-        "Unable to Load FlowTask Task Component, we can't send Tasks to any Worker."
+        f"Unable to Load FlowTask, we can't send Tasks to any Worker: {exc}"
     )
 from ..exceptions import QWException
 from .base import QueueWrapper
+
 
 class TaskWrapper(QueueWrapper):
     """Wraps a DI Task and arguments"""
     def __init__(self, program, task, *args, task_id: str = None, **kwargs):
         super(TaskWrapper, self).__init__(*args, **kwargs)
-        try:
-            self.new_args = kwargs['new_args']
-            del kwargs['new_args']
-        except KeyError:
-            self.new_args = []
-        try:
-            self.host = kwargs['host']
-            del kwargs['host']
-        except KeyError:
-            self.host = 'localhost'
-        try:
-            self._debug = kwargs['debug']
-            del kwargs['debug']
-        except KeyError:
-            self._debug = False
+        self.new_args = kwargs.pop('new_args', [])
+        self.host = kwargs.pop('host', 'localhost')
+        self._debug = kwargs.pop('debug', False)
         self.program = program
         self.task = task
         self._task = None
@@ -77,20 +66,15 @@ class TaskWrapper(QueueWrapper):
                 debug=self._debug,
                 **self.kwargs
             )
-        except TaskNotFound as ex:
-            raise TaskNotFound(
-                f"Task Not Found: {ex}"
-            )
-        except TaskError:
-            raise
-        except (FileNotFound, EmptyFile) as exc:
-            logging.warning(exc)
-            raise
         except (
+            TaskNotFound,
+            TaskError,
+            FileNotFound,
+            EmptyFile,
             DataNotFound,
             NotFound
-        ) as exc:
-            logging.warning(exc)
+        ) as ex:
+            logging.warning(ex)
             raise
         except Exception as exc:
             logging.exception(exc, stack_info=True)
@@ -117,6 +101,16 @@ class TaskWrapper(QueueWrapper):
                 "stats": stats
             }
             return result
+        except (
+            TaskNotFound,
+            TaskError,
+            FileNotFound,
+            EmptyFile,
+            DataNotFound,
+            NotFound
+        ) as ex:
+            logging.warning(ex)
+            raise
         except Exception as err:  # pylint: disable=W0703
             raise TaskFailed(
                 f"{err}"
@@ -152,6 +146,16 @@ class TaskWrapper(QueueWrapper):
             )
             try:
                 result = await task.run()
+            except (
+                TaskNotFound,
+                TaskError,
+                FileNotFound,
+                EmptyFile,
+                DataNotFound,
+                NotFound
+            ) as ex:
+                logging.warning(ex)
+                raise
             except Exception as err:
                 logging.exception(err, stack_info=False)
                 if isinstance(err, TaskException):

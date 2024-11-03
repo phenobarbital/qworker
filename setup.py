@@ -104,13 +104,14 @@ setup(
     install_requires=[
         'asyncio==3.4.3',
         'ciso8601>=2.2.0',
-        'navconfig[default]>=1.7.0',
-        'asyncdb[default]>=2.8.0',
+        'navconfig[uvloop,default]>=1.7.9',
+        'asyncdb[default]>=2.9.0',
+        'async-notify[default]>=1.3.4',
         'cloudpickle>=3.0.0',
         'jsonpickle>=3.0.2',
         'beautifulsoup4>=4.12.3',
         'async-timeout==4.0.3',
-        'msgpack==1.0.8',
+        'msgpack==1.1.0',
     ],
     ext_modules=cythonize(extensions),
     entry_points={

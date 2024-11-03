@@ -5,12 +5,13 @@ import multiprocessing as mp
 from navconfig.logging import logging
 from notify.providers.telegram import Telegram
 from notify.models import Chat
-from flowtask.conf import (
-    EVENT_CHAT_ID,
-    ENVIRONMENT
-)
 from ..wrappers import QueueWrapper, FuncWrapper, TaskWrapper
-from ..conf import WORKER_CONCURRENCY_NUMBER, WORKER_TASK_TIMEOUT
+from ..conf import (
+    WORKER_CONCURRENCY_NUMBER,
+    WORKER_TASK_TIMEOUT,
+    ENVIRONMENT,
+    EVENT_CHAT_ID
+)
 
 class TaskExecutor:
     def __init__(self, task, *args, **kwargs):

@@ -4,14 +4,19 @@ from typing import Union
 from collections.abc import Awaitable, Callable
 import importlib
 from navconfig.logging import logging
-from flowtask.exceptions import (
-    NotFound,
-    DataNotFound,
-    FileNotFound,
-    TaskFailed,
-    TaskNotFound,
-    NotSupported
-)
+try:
+    from flowtask.exceptions import (
+        NotFound,
+        DataNotFound,
+        FileNotFound,
+        TaskFailed,
+        TaskNotFound,
+        NotSupported
+    )
+except ImportError:
+    logging.warning(
+        "Unable to Load FlowTask, we can't handle Flowtask in Queue Manager."
+    )
 from qw.exceptions import QWException
 from ..conf import (
     WORKER_QUEUE_SIZE,
@@ -141,8 +146,10 @@ class QueueManager:
             try:
                 executor = TaskExecutor(task)
                 result = await executor.run()
-                if type(result) == asyncio.TimeoutError:
-                    raise
+                if isinstance(result, asyncio.TimeoutError):
+                    raise asyncio.TimeoutError(
+                        f"Task {task} with id {task.id} was cancelled."
+                    )
                 elif type(result) in (
                     NotFound,
                     DataNotFound,
@@ -151,7 +158,7 @@ class QueueManager:
                     TaskNotFound,
                     NotSupported
                 ):
-                    raise
+                    raise result
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.
                     if task.retry() is True:  # task was marked to retry
