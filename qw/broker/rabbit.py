@@ -226,19 +226,54 @@ class RabbitMQConnection:
                 f"Failed to publish message: {exc}"
             )
 
+    def wrap_callback(
+        self,
+        callback: Callable[[aiormq.abc.DeliveredMessage, str], Awaitable[None]],
+        requeue_on_fail: bool = False
+    ) -> Callable:
+        """
+        Wrap the user-provided callback to handle message decoding and
+        acknowledgment.
+        """
+        async def wrapped_callback(message: aiormq.abc.DeliveredMessage):
+            try:
+                body = message.body.decode('utf-8')
+                if asyncio.iscoroutinefunction(callback):
+                    await callback(message, body)
+                else:
+                    callback(message, body)
+                # Acknowledge the message to indicate it has been processed
+                await self._channel.basic_ack(message.delivery_tag)
+                self.logger.debug(f"Message acknowledged: {message.delivery_tag}")
+            except Exception as e:
+                self.logger.error(f"Error processing message: {e}")
+                # Optionally, reject the message and requeue it
+                await self._channel.basic_nack(message.delivery_tag, requeue=requeue_on_fail)
+        return wrapped_callback
+
     async def consume_messages(
         self,
         queue: str,
-        callback: Union[Callable, Awaitable]
+        callback: Callable[[aiormq.abc.DeliveredMessage, str], Awaitable[None]],
+        prefetch_count: int = 1
     ) -> None:
         """
-        Consumes a Message from RabbitMQ Queue.
+        Consume messages from a queue.
         """
         await self.ensure_connection()
         try:
-            await self._channel.queue_declare(queue)
-            await self._channel.basic_consume(queue, callback)
-        except Exception as e:
-            self.logger.error(
-                f"Failed to consume message: {e}"
+            # Ensure the queue exists
+            await self._channel.queue_declare(queue=queue, durable=True)
+
+            # Set QoS (Quality of Service) settings
+            await self._channel.basic_qos(prefetch_count=prefetch_count)
+
+            # Start consuming messages from the queue
+            await self._channel.basic_consume(
+                queue=queue,
+                consumer_callback=self.wrap_callback(callback),
             )
+            self.logger.info(f"Started consuming messages from queue '{queue}'.")
+        except Exception as e:
+            self.logger.error(f"Error consuming messages: {e}")
+            raise

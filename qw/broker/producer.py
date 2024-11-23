@@ -153,7 +153,10 @@ class BrokerManager(RabbitMQConnection, metaclass=Singleton):
 
         # Cancel worker tasks
         for task in self._workers:
-            task.cancel()
+            try:
+                task.cancel()
+            except asyncio.CancelledError:
+                pass
 
         # Wait for worker tasks to finish
         await asyncio.gather(*self._workers, return_exceptions=True)
@@ -180,6 +183,7 @@ class BrokerManager(RabbitMQConnection, metaclass=Singleton):
                     **kwargs
                 }
             )
+            await asyncio.sleep(.1)
         except asyncio.QueueFull:
             self.logger.error(
                 "Event queue is full. Event will not published."
