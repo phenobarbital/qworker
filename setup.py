@@ -112,6 +112,7 @@ setup(
         'beautifulsoup4>=4.12.3',
         'async-timeout==4.0.3',
         'msgpack==1.1.0',
+        'aiormq==6.8.1',
     ],
     ext_modules=cythonize(extensions),
     entry_points={

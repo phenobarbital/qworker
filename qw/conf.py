@@ -79,6 +79,21 @@ TELEGRAM_CHAT_ID = config.get("TELEGRAM_CHAT_ID")
 EVENT_CHAT_BOT = config.get("EVENT_CHAT_BOT", fallback=TELEGRAM_BOT_TOKEN)
 EVENT_CHAT_ID = config.get("EVENT_CHAT_ID", fallback=TELEGRAM_CHAT_ID)
 
+"""
+RabbitMQ Configuration.
+"""
+RABBITMQ_HOST = config.get("RABBITMQ_HOST", fallback="localhost")
+RABBITMQ_PORT = config.get("RABBITMQ_PORT", fallback=5672)
+RABBITMQ_USER = config.get("RABBITMQ_USER", fallback="guest")
+RABBITMQ_PASS = config.get("RABBITMQ_PASS", fallback="guest")
+RABBITMQ_VHOST = config.get("RABBITMQ_VHOST", fallback="navigator")
+# DSN
+rabbitmq_dsn = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+BROKER_MANAGER_QUEUE_SIZE = config.getint(
+    "BROKER_MANAGER_QUEUE_SIZE",
+    fallback=4
+)
+
 try:
     from settings.settings import (
         WORKER_LIST,
