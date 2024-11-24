@@ -27,6 +27,7 @@ class BrokerConsumer(RabbitMQConnection):
         self,
         dsn: Optional[str] = None,
         timeout: Optional[int] = 5,
+        callback: Optional[Union[Awaitable, Callable]] = None,
         **kwargs
     ):
         self._routing_key = kwargs.get('routing_key', '*')
@@ -36,6 +37,7 @@ class BrokerConsumer(RabbitMQConnection):
         super(BrokerConsumer, self).__init__(dsn, timeout, **kwargs)
         self.logger = logging.getLogger('BrokerConsumer')
         self._serializer = DataSerializer()
+        self._callback_ = callback if callback else self.subscriber_callback
 
     async def subscriber_callback(
         self,
@@ -46,7 +48,8 @@ class BrokerConsumer(RabbitMQConnection):
         Default Callback for Event Subscription.
         """
         try:
-            print(f"Received message: {body}")
+            print(f"Received message: {message}")
+            print(f"Received Body: {body}")
             self.logger.info(f'Received Message: {body}')
         except Exception as e:
             self.logger.error(
@@ -125,7 +128,7 @@ class BrokerConsumer(RabbitMQConnection):
             exchange=self._exchange_name,
             queue_name=self._queue_name,
             routing_key=self._routing_key,
-            callback=self.subscriber_callback,
+            callback=self._callback_,
             exchange_type=self._exchange_type,
             durable=True,
             prefetch_count=1,
