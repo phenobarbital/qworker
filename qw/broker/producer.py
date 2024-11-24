@@ -17,6 +17,7 @@ from navigator_auth.conf import (
 )
 from ..conf import BROKER_MANAGER_QUEUE_SIZE
 from .rabbit import RabbitMQConnection
+from .pickle import DataSerializer
 
 
 # Disable Debug Logging for AIORMQ
@@ -54,6 +55,7 @@ class BrokerManager(RabbitMQConnection, metaclass=Singleton):
         self._workers = []
         super(BrokerManager, self).__init__(dsn, timeout, **kwargs)
         self.__initialized__ = True
+        self._serializer = DataSerializer()
 
     def setup(self, app: web.Application = None) -> None:
         """
@@ -75,6 +77,9 @@ class BrokerManager(RabbitMQConnection, metaclass=Singleton):
         self.app.router.add_post(
             '/api/v1/broker/events/publish_event',
             self.event_publisher
+        )
+        self.logger.notice(
+            ":: Starting RabbitMQ Producer ::"
         )
 
     async def start_workers(self):
@@ -175,7 +180,7 @@ class BrokerManager(RabbitMQConnection, metaclass=Singleton):
         Puts an Event into the Queue to be processed for Producer later.
         """
         try:
-            await self.event_queue.put_nowait(
+            self.event_queue.put_nowait(
                 {
                     'exchange': exchange,
                     'routing_key': routing_key,

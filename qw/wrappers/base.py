@@ -6,7 +6,6 @@ Any other wrapper extends this.
 import random
 import uuid
 
-# coro = Callable[[int], Coroutine[Any, Any, str]]
 
 class QueueWrapper:
     _queued: bool = True

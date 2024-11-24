@@ -1,14 +1,19 @@
 """
 RabbitMQ interface (connection and disconnections).
 """
-from typing import Optional, Union
+from typing import Optional, Union, Any
 from collections.abc import Callable, Awaitable
 import asyncio
+from dataclasses import is_dataclass
 import aiormq
 from aiormq.abc import AbstractConnection, AbstractChannel
 from navconfig.logging import logging
-from navigator.libs.json import json_encoder
+from datamodel import BaseModel
+from navigator.libs.json import json_encoder, json_decoder
+from navigator.exceptions import ValidationError
 from ..conf import rabbitmq_dsn
+from .pickle import DataSerializer
+from ..wrappers.base import QueueWrapper
 
 
 class RabbitMQConnection:
@@ -33,6 +38,7 @@ class RabbitMQConnection:
         )
         self.reconnect_delay = 1  # Initial delay in seconds
         self._lock = asyncio.Lock()
+        self._serializer = DataSerializer()
 
     def get_connection(self) -> Optional[AbstractConnection]:
         if not self._connection:
@@ -196,7 +202,7 @@ class RabbitMQConnection:
         self,
         exchange_name: str,
         routing_key: str,
-        body: Union[str, list, dict],
+        body: Union[str, list, dict, Any],
         **kwargs
     ) -> None:
         """
@@ -205,20 +211,38 @@ class RabbitMQConnection:
         await self.ensure_connection()
         # Ensure the exchange exists before publishing
         await self.ensure_exchange(exchange_name)
-
+        headers = kwargs.get('headers', {})
+        headers.setdefault('x-retry', '0')
         args = {
             "mandatory": True,
             "timeout": None,
             **kwargs
         }
+        properties_kwargs = {
+            'headers': headers,
+            'delivery_mode': 2  # Persistent messages
+        }
         if isinstance(body, (dict, list)):
             body = json_encoder(body)
+            properties_kwargs['content_type'] = 'application/json'
+        elif is_dataclass(body) or isinstance(body, BaseModel):
+            body = self._serializer.encode(body)
+            properties_kwargs['content_type'] = 'application/jsonpickle'
+        elif isinstance(body, QueueWrapper):
+            body = self._serializer.serialize(body)
+            properties_kwargs['content_type'] = 'application/cloudpickle'
+        else:
+            # Handle other types if necessary
+            body = str(body)
+            properties_kwargs['content_type'] = 'text/plain'
         try:
             await self._channel.basic_publish(
                 body.encode('utf-8'),
                 exchange=exchange_name,
                 routing_key=routing_key,
-                properties=aiormq.spec.Basic.Properties(delivery_mode=2),
+                properties=aiormq.spec.Basic.Properties(
+                    **properties_kwargs
+                ),
                 **args
             )
         except Exception as exc:
@@ -226,10 +250,52 @@ class RabbitMQConnection:
                 f"Failed to publish message: {exc}"
             )
 
+    async def process_message(
+        self,
+        body: bytes,
+        properties: aiormq.spec.Basic.Properties
+    ) -> str:
+        """
+        Process the message received by the consumer.
+        """
+        content_type = properties.content_type or 'text/plain'
+        body_str = body.decode('utf-8')
+        if content_type == 'application/json':
+            try:
+                return json_decoder(body_str)
+            except ValidationError:
+                self.logger.warning(
+                    "Error deserializing JSON object."
+                )
+                return body_str
+        elif content_type == 'application/jsonpickle':
+            try:
+                return self._serializer.decode(body_str)
+            except RuntimeError:
+                self.logger.warning(
+                    "Error deserializing jsonpickle object."
+                )
+                return body_str
+        elif content_type == 'application/cloudpickle':
+            try:
+                return self._serializer.deserialize(body_str)
+            except RuntimeError:
+                self.logger.warning(
+                    "Error deserializing cloudpickled object."
+                )
+                return body_str
+        elif content_type == 'text/plain':
+            return body_str
+        else:
+            raise RuntimeError(
+                f"Unsupported content type: {content_type}"
+            )
+
     def wrap_callback(
         self,
         callback: Callable[[aiormq.abc.DeliveredMessage, str], Awaitable[None]],
-        requeue_on_fail: bool = False
+        requeue_on_fail: bool = False,
+        max_retries: int = 3
     ) -> Callable:
         """
         Wrap the user-provided callback to handle message decoding and
@@ -237,18 +303,69 @@ class RabbitMQConnection:
         """
         async def wrapped_callback(message: aiormq.abc.DeliveredMessage):
             try:
-                body = message.body.decode('utf-8')
+                properties = message.header.properties or aiormq.spec.Basic.Properties()
+                body = await self.process_message(message.body, properties)
                 if asyncio.iscoroutinefunction(callback):
                     await callback(message, body)
                 else:
                     callback(message, body)
                 # Acknowledge the message to indicate it has been processed
                 await self._channel.basic_ack(message.delivery_tag)
-                self.logger.debug(f"Message acknowledged: {message.delivery_tag}")
+                self.logger.debug(
+                    f"Message acknowledged: {message.delivery_tag}"
+                )
             except Exception as e:
-                self.logger.error(f"Error processing message: {e}")
-                # Optionally, reject the message and requeue it
-                await self._channel.basic_nack(message.delivery_tag, requeue=requeue_on_fail)
+                self.logger.warning(
+                    f"Error processing message: {e}"
+                )
+                # Get retry count from message properties headers
+                properties = message.header.properties or aiormq.spec.Basic.Properties()
+                headers = dict(properties.headers or {})
+                retry_count = headers.get('x-retry', 0)
+                # Ensure retry_count is an integer
+                if isinstance(retry_count, bytes):
+                    retry_count = int(retry_count.decode())
+                elif isinstance(retry_count, str):
+                    retry_count = int(retry_count)
+                else:
+                    retry_count = int(retry_count)
+                retry_count += 1
+                if retry_count <= max_retries:
+                    self.logger.info(
+                        f"Retrying message {message.delivery_tag}, attempt {retry_count}/{max_retries}"
+                    )
+                    # Optionally, reject the message and requeue it
+                    await self._channel.basic_nack(message.delivery_tag, requeue=False)
+                    # Republish the message with incremented retry count
+                    new_headers = headers.copy()
+                    new_headers['x-retry'] = str(retry_count)
+                    new_properties = aiormq.spec.Basic.Properties(
+                        content_type=properties.content_type,
+                        content_encoding=properties.content_encoding,
+                        headers=new_headers,
+                        delivery_mode=properties.delivery_mode,
+                        priority=properties.priority,
+                        correlation_id=properties.correlation_id,
+                        reply_to=properties.reply_to,
+                        expiration=properties.expiration,
+                        message_id=properties.message_id,
+                        timestamp=properties.timestamp,
+                        message_type=properties.message_type,
+                        user_id=properties.user_id,
+                        app_id=properties.app_id,
+                    )
+                    await self._channel.basic_publish(
+                        exchange=message.delivery.exchange,
+                        routing_key=message.delivery.routing_key,
+                        body=message.body,
+                        properties=new_properties
+                    )
+                else:
+                    self.logger.error(
+                        f"Max retries exceeded for message {message.delivery_tag}. Discarding message."
+                    )
+                    # Reject the message without requeueing
+                    await self._channel.basic_nack(message.delivery_tag, requeue=False)
         return wrapped_callback
 
     async def consume_messages(
@@ -273,7 +390,11 @@ class RabbitMQConnection:
                 queue=queue,
                 consumer_callback=self.wrap_callback(callback),
             )
-            self.logger.info(f"Started consuming messages from queue '{queue}'.")
+            self.logger.info(
+                f"Started consuming messages from queue '{queue}'."
+            )
         except Exception as e:
-            self.logger.error(f"Error consuming messages: {e}")
+            self.logger.error(
+                f"Error consuming messages: {e}"
+            )
             raise

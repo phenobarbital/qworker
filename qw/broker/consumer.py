@@ -5,12 +5,12 @@ can be used to consume messages from RabbitMQ.
 """
 from typing import Union, Optional
 from collections.abc import Callable, Awaitable
-import asyncio
 from aiohttp import web
 import aiormq
 from navconfig.logging import logging
 from navigator.applications.base import BaseApplication
 from .rabbit import RabbitMQConnection
+from .pickle import DataSerializer
 
 
 # Disable Debug Logging for AIORMQ
@@ -21,6 +21,8 @@ class BrokerConsumer(RabbitMQConnection):
     """
     Broker Client (Consumer) using RabbitMQ.
     """
+    _name_: str = "broker_consumer"
+
     def __init__(
         self,
         dsn: Optional[str] = None,
@@ -33,27 +35,24 @@ class BrokerConsumer(RabbitMQConnection):
         self._queue_name = kwargs.get('queue_name', 'navigator')
         super(BrokerConsumer, self).__init__(dsn, timeout, **kwargs)
         self.logger = logging.getLogger('BrokerConsumer')
+        self._serializer = DataSerializer()
 
     async def subscriber_callback(
         self,
         message: aiormq.abc.DeliveredMessage,
-        callback: Union[Callable, Awaitable]
+        body: str
     ) -> None:
         """
         Default Callback for Event Subscription.
         """
-        body = message.body.decode('utf-8')
         try:
-            if asyncio.iscoroutinefunction(callback):
-                await callback(message, body)
-            else:
-                callback(message, body)
-            # Acknowledge the message to indicate it has been processed
-            await self._channel.basic_ack(message.delivery_tag)
+            print(f"Received message: {body}")
+            self.logger.info(f'Received Message: {body}')
         except Exception as e:
-            self.logger.error(f"Error processing message: {e}")
-            # Optionally, reject the message and requeue it
-            await self._channel.basic_nack(message.delivery_tag, requeue=True)
+            self.logger.error(
+                f"Error in subscriber_callback: {e}"
+            )
+            raise
 
     async def event_subscribe(
         self,
@@ -77,6 +76,7 @@ class BrokerConsumer(RabbitMQConnection):
         durable: bool = True,
         prefetch_count: int = 1,
         requeue_on_fail: bool = True,
+        max_retries: int = 3,
         **kwargs
     ) -> None:
         """
@@ -101,7 +101,11 @@ class BrokerConsumer(RabbitMQConnection):
             # Start consuming messages from the queue
             await self._channel.basic_consume(
                 queue=queue_name,
-                consumer_callback=self.wrap_callback(callback, requeue_on_fail=requeue_on_fail),
+                consumer_callback=self.wrap_callback(
+                    callback,
+                    requeue_on_fail=requeue_on_fail,
+                    max_retries=max_retries
+                ),
                 **kwargs
             )
             self.logger.info(
@@ -147,4 +151,4 @@ class BrokerConsumer(RabbitMQConnection):
         # Initialize the Producer instance.
         self.app.on_startup.append(self.start)
         self.app.on_shutdown.append(self.stop)
-        self.app['broker_consumer'] = self
+        self.app[self._name_] = self
