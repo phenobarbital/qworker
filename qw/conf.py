@@ -94,6 +94,13 @@ BROKER_MANAGER_QUEUE_SIZE = config.getint(
     fallback=4
 )
 
+# Dask Cluster:
+DASK_SCHEDULER = config.get("DASK_SCHEDULER", fallback="tcp://127.0.0.1:8786")
+DASK_SCHEDULER_PORT = config.get(
+    "DASK_SCHEDULER_PORT",
+    fallback=8786
+)
+
 try:
     from settings.settings import (
         WORKER_LIST,
