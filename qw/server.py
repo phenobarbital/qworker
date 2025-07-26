@@ -7,7 +7,6 @@ import base64
 import asyncio
 import inspect
 import random
-import datetime
 from typing import Any, Union, Optional
 from collections.abc import Callable, Awaitable
 import multiprocessing as mp
@@ -15,6 +14,11 @@ from redis import asyncio as aioredis
 from redis.exceptions import ResponseError, ConnectionError
 import cloudpickle
 from navconfig.logging import logging
+from flowtask.exceptions import (
+    TaskException,
+    TaskError,
+    TaskNotFound
+)
 from qw.exceptions import (
     QWException,
     ParserError,
@@ -41,9 +45,7 @@ from .wrappers import (
 )
 from .executor import TaskExecutor
 
-DEFAULT_HOST = WORKER_DEFAULT_HOST
-if not DEFAULT_HOST:
-    DEFAULT_HOST = socket.gethostbyname(socket.gethostname())
+DEFAULT_HOST = WORKER_DEFAULT_HOST or socket.gethostbyname(socket.gethostname())
 
 
 class QWorker:
@@ -77,11 +79,8 @@ class QWorker:
         self._running: bool = True
         self._notify_empty_stream = notify_empty_stream
         self._empty_stream_minutes = empty_stream_minutes
-        if name:
-            self._name = name
-        else:
-            self._name = mp.current_process().name
-        self._loop = event_loop if event_loop else asyncio.new_event_loop()
+        self._name = name or mp.current_process().name
+        self._loop = event_loop or asyncio.new_event_loop()
         self._server: Callable = None
         self._pid = os.getpid()
         self._protocol = protocol

@@ -3,6 +3,9 @@ venv:
 	echo 'run `source .venv/bin/activate` to start develop Queue Workers.'
 
 install:
+	pip install --upgrade navigator-session navigator-auth
+	pip install --upgrade querysource
+	pip install --upgrade flowtask
 	pip install -e .
 
 develop:

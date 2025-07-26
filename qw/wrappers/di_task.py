@@ -5,22 +5,17 @@ Wrapping a Flowtask-task to be executed by Worker.
 import asyncio
 import multiprocessing as mp
 from navconfig.logging import logging
-try:
-    from flowtask.tasks.task import Task
-    from flowtask.exceptions import (
-        TaskException,
-        TaskNotFound,
-        TaskError,
-        FileNotFound,
-        EmptyFile,
-        DataNotFound,
-        NotFound,
-        TaskFailed
-    )
-except ImportError as exc:
-    logging.warning(
-        f"Unable to Load FlowTask, we can't send Tasks to any Worker: {exc}"
-    )
+from flowtask.tasks.task import Task
+from flowtask.exceptions import (
+    TaskException,
+    TaskNotFound,
+    TaskError,
+    FileNotFound,
+    EmptyFile,
+    DataNotFound,
+    NotFound,
+    TaskFailed
+)
 from ..exceptions import QWException
 from .base import QueueWrapper
 
@@ -36,10 +31,9 @@ class TaskWrapper(QueueWrapper):
         self.task = task
         self._task = None
         self.args, self.kwargs = args, kwargs
-        if task_id is not None:
-            self.id = task_id
-        else:
-            self.id = self._id
+        # If task_id is provided, use it; otherwise, use the generated UUID
+        print(' Task ID provided: ', task_id)
+        self.id = task_id or self._id
 
     def task_id(self):
         return f'{self.id!s}'
@@ -48,7 +42,7 @@ class TaskWrapper(QueueWrapper):
         return self._task
 
     def __repr__(self):
-        return f'Task(task={self.task}, program={self.program}, debug={self._debug})'
+        return f'Task(task={self.task}, program={self.program}, debug={self._debug}: id={self.id})'
 
     async def create(self):
         try:

@@ -12,12 +12,12 @@ class QueueWrapper:
     _debug: bool = False
 
     def __init__(self, coro=None, *args, **kwargs):
-        if 'queued' in kwargs:
-            self._queued = kwargs['queued']
-            del kwargs['queued']
-        self._id = uuid.uuid1(
-            node=random.getrandbits(48) | 0x010000000000
-        )
+        self._queued: bool = kwargs.pop('queued', True)
+        self._debug: bool = kwargs.pop('debug', False)
+        self._id: uuid.UUID = kwargs.pop('id', uuid.uuid4())
+        if not isinstance(self._id, uuid.UUID):
+            self._id = uuid.UUID(self._id)
+        # print(f"Generated UUID: {self._id} for task {getattr(self, 'task', 'unknown')}")
         self.args = args
         self.kwargs = kwargs
         self.loop = None

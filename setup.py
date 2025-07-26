@@ -116,6 +116,11 @@ setup(
         'modin==0.32.0',
         'dask[complete]==2024.8.2'
     ],
+    extras_require={
+        "tasks": [
+            'flowtask>=5.8.20'
+        ]
+    },
     ext_modules=cythonize(extensions),
     entry_points={
         'console_scripts': [

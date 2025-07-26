@@ -8,7 +8,17 @@ Collection of wrappers for different kind of Objects to be launched by workers.
 
 from .func import FuncWrapper
 from .base import QueueWrapper
-from .di_task import TaskWrapper
+try:
+    from .di_task import TaskWrapper
+except Exception as e:
+    print(
+        f"Error importing TaskWrapper: {e}"
+    )
+    TaskWrapper = None
 
 
-__all__ = ('QueueWrapper', 'FuncWrapper', 'TaskWrapper', )
+__all__ = (
+    'QueueWrapper',
+    'FuncWrapper',
+    'TaskWrapper',
+)
