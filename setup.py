@@ -112,7 +112,7 @@ setup(
         'beautifulsoup4>=4.12.3',
         'async-timeout==4.0.3',
         'msgpack==1.1.0',
-        'aiormq==6.8.1',
+        'aiormq==6.9.0',
         'modin==0.32.0',
         'dask[complete]==2024.8.2'
     ],
