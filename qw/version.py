@@ -8,7 +8,7 @@ __description__ = (
    'built on top of Asyncio.'
    'Can you spawn distributed workers to run functions inside workers.'
 )
-__version__ = '1.13.1'
+__version__ = '1.13.2'
 __author__ = 'Jesus Lara'
 __author_email__ = 'jesuslarag@gmail.com'
 __license__ = 'MIT'
