@@ -110,7 +110,7 @@ setup(
         'cloudpickle>=3.0.0',
         'jsonpickle>=3.0.2',
         'beautifulsoup4>=4.12.3',
-        'async-timeout==4.0.3',
+        'async-timeout==5.0.1',
         'msgpack==1.1.0',
         'aiormq==6.9.2',
         'modin==0.32.0',
