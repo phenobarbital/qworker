@@ -141,10 +141,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Rewrote `.github/workflows/release.yml` to a single `build-and-publish` job using `astral-sh/setup-uv@v4`, `uv build`, and `uv publish` with `UV_PUBLISH_TOKEN: ${{ secrets.QUEUEWORKER_TOKEN }}`. Removed manylinux matrix, cibuildwheel, Windows build, and multi-artifact download logic. YAML validated successfully.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
