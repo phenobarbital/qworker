@@ -106,10 +106,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Deleted `qw/exceptions.pyx` and `qw/exceptions.pxd` via `git rm`. Note: `qw/utils/json.pyx` was already deleted in TASK-002. No `.c`, `.cpp`, or `.so` files were present in the worktree (already cleaned or never generated in dev environment). Verified no Cython artifacts remain under `qw/`. `from qw.exceptions import QWException` still works via the `.py` file created in TASK-001.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
