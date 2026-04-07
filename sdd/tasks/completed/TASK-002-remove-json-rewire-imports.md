@@ -131,10 +131,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Deleted `qw/utils/json.pyx` via `git rm`. Updated `qw/protocols.py:12` and `qw/discovery.py:8` to import from `datamodel.parsers.encoders.json`. Verified no remaining `qw.utils.json` references in `.py` files.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
