@@ -7,7 +7,7 @@
       "feature_id": "FEAT-001",
       "feature": "uv-migration",
       "spec": "sdd/specs/uv-migration.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
@@ -15,7 +15,8 @@
       "parallelism_notes": "No file overlap with TASK-002 or TASK-004; creates qw/exceptions.py while TASK-002 modifies protocols.py/discovery.py",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-001-pure-python-exceptions.md"
+      "completed_at": "2026-04-08T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-001-pure-python-exceptions.md"
     },
     {
       "id": "TASK-002",

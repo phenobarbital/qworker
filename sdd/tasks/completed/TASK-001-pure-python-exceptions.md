@@ -204,10 +204,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Created `qw/exceptions.py` as a direct 1:1 conversion of `qw/exceptions.pyx`. All 5 exception classes converted from Cython `cdef class` to standard Python `class`. All acceptance criteria verified with inline Python assertions.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
