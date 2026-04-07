@@ -73,10 +73,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Deleted `setup.py` via `git rm`. The `pyproject.toml` (TASK-004) now handles all build configuration. Note: `uv build` test is a CI-level test and requires the full environment setup.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
