@@ -114,10 +114,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Used Option A — updated `MANIFEST.in` to add `global-exclude` rules for `*.pyx`, `*.pxd`, `*.c`, `*.cpp`, `*.so`, and `*.pyo`. `CHANGELOG.md` verified to exist, so the `include` line was kept. The `graft qw` directive is kept since all Cython artifacts are already deleted and MANIFEST.in exclusions provide extra safety.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
