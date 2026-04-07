@@ -97,7 +97,7 @@
       "feature_id": "FEAT-001",
       "feature": "uv-migration",
       "spec": "sdd/specs/uv-migration.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "medium",
       "effort": "M",
       "depends_on": ["TASK-004"],
@@ -105,7 +105,8 @@
       "parallelism_notes": "Only modifies Makefile; can run in parallel with TASK-005, TASK-007, TASK-008 after TASK-004",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-006-makefile-modernization.md"
+      "completed_at": "2026-04-08T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-006-makefile-modernization.md"
     },
     {
       "id": "TASK-007",

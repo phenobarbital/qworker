@@ -170,10 +170,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Rewrote Makefile with all uv-based targets: `install-uv`, `venv`, `install`, `develop`, `lock`, `sync`, `update`, `test`, `format`, `lint`, `release`, `clean`, `distclean`, `bump-patch`, `bump-minor`, `bump-major`, `add`, `add-dev`, `remove`, `info`, `help`. No references to pip, flit, or Cython. `.pylintrc` verified to exist. `make help` tested successfully.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
