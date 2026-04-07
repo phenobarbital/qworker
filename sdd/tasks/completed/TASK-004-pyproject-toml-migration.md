@@ -226,10 +226,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-08
+**Notes**: Rewrote `pyproject.toml` to PEP 621 format. Removed `[tool.flit.metadata]`, added `[project]` table with `requires-python = ">=3.11"`, dynamic version from `qw/version.py`, all core deps with relaxed pins, `modin`/`dask` in `[data]` extra, `[project.scripts]` for `qw` entrypoint, `[dependency-groups]` for dev deps. No Cython, no `asyncio`, no `orjson` in deps. TOML validated successfully.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
