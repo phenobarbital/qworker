@@ -1,11 +1,7 @@
 """Queue Worker server entry point."""
-# import os
-# import warnings
 import asyncio
 import argparse
-
-# os.environ['PYTHONASYNCIODEBUG'] = '1'
-# warnings.resetwarnings()
+import sys
 
 from qw.conf import (
     WORKER_DEFAULT_HOST,
@@ -14,19 +10,18 @@ from qw.conf import (
     WORKER_DEFAULT_QTY,
     WORKER_QUEUE_SIZE,
     WORKER_DISCOVERY_PORT
-
 )
 from .process import SpawnProcess
 from .utils import cPrint
 from .utils.events import enable_uvloop
 
 
-def main():
-    """Main Worker Function."""
-    enable_uvloop()
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawTextHelpFormatter
-    )
+# ---------------------------------------------------------------------------
+# Server start action
+# ---------------------------------------------------------------------------
+
+def _add_start_args(parser: argparse.ArgumentParser) -> None:
+    """Add all server-start arguments to a parser (shared by root and start sub)."""
     parser.add_argument(
         '--host', dest='host', type=str,
         default=WORKER_DEFAULT_HOST,
@@ -89,7 +84,10 @@ def main():
         default=False,
         help="Start workers in Debug Mode"
     )
-    args = parser.parse_args()
+
+
+def run_start(args: argparse.Namespace) -> None:
+    """Start the QWorker server process."""
     process = None
     try:
         loop = asyncio.new_event_loop()
@@ -99,16 +97,99 @@ def main():
         process.start()
         loop.run_forever()
     except KeyboardInterrupt:
-        process.terminate()
+        if process:
+            process.terminate()
     except Exception as ex:
-        # log the unexpected error
         print(f"Unexpected error: {ex}")
         if process:
             process.terminate()
     finally:
         cPrint('Shutdown all workers ...', level='WARN')
-        # print stack for all tasks
-        loop.close()  # close the event loop
+        try:
+            loop.close()
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Info action
+# ---------------------------------------------------------------------------
+
+def run_info(args: argparse.Namespace) -> None:
+    """Connect to a running qworker and display task state."""
+    from .cli.info import execute_info
+    execute_info(args)
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def main():
+    """Main Worker Function.
+
+    Backward compatible: `qw` with no subcommand (or with server flags like
+    --host, --port, --workers) starts the server. `qw info` queries state.
+    """
+    enable_uvloop()
+
+    # Build main parser with subparsers
+    parser = argparse.ArgumentParser(
+        prog='qw',
+        description='QueueWorker — Asynchronous Task Queue System',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+
+    subparsers = parser.add_subparsers(dest='command')
+
+    # 'start' subcommand — explicit server start
+    start_parser = subparsers.add_parser(
+        'start',
+        help='Start the QWorker server',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    _add_start_args(start_parser)
+    start_parser.set_defaults(func=run_start)
+
+    # 'info' subcommand
+    info_parser = subparsers.add_parser(
+        'info',
+        help='Query the state of a running QWorker',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    info_parser.add_argument(
+        '--host', dest='host', type=str,
+        default=WORKER_DEFAULT_HOST,
+        help='Worker host to query (default: %(default)s)'
+    )
+    info_parser.add_argument(
+        '--port', dest='port', type=int,
+        default=WORKER_DEFAULT_PORT,
+        help='Worker port to query (default: %(default)s)'
+    )
+    info_parser.add_argument(
+        '--json', dest='json_output', action='store_true',
+        default=False,
+        help='Output raw JSON instead of formatted table'
+    )
+    info_parser.add_argument(
+        '--watch', dest='watch', type=int, default=None,
+        metavar='N',
+        help='Poll every N seconds (continuous monitoring)'
+    )
+    info_parser.set_defaults(func=run_info)
+
+    # Also add server args to root parser for backward compatibility.
+    # When no subcommand is given, old-style `qw --host H --port P` still works.
+    _add_start_args(parser)
+
+    args = parser.parse_args()
+
+    if args.command is None:
+        # No subcommand → start server (backward compatible behavior)
+        run_start(args)
+    else:
+        args.func(args)
 
 
 if __name__ == '__main__':
