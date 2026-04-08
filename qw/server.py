@@ -504,7 +504,16 @@ class QWorker:
             state = self._state.get_state()
         else:
             state = {}
-        payload = json_encoder({self._name: state})
+        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        payload = json_encoder({
+            "worker": {
+                "name": self._name,
+                "pid": self._pid,
+                "address": self.server_address,
+                "serving": addrs,
+            },
+            "state": state,
+        })
         await self.closing_writer(writer, payload.encode('utf-8'))
 
     async def discard_task(self, message: str, writer: asyncio.StreamWriter):

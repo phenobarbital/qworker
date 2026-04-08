@@ -149,9 +149,9 @@ def main():
     )
     info_parser.add_argument(
         '--watch', dest='watch', type=int,
-        default=0,
+        default=None,
         metavar='SECONDS',
-        help='Refresh every N seconds (0 = run once)'
+        help='Refresh every N seconds (omit to run once)'
     )
     info_parser.add_argument(
         '--json', dest='json_output', action='store_true',
