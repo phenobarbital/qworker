@@ -9,7 +9,7 @@ from redis import asyncio as aioredis
 from navconfig.logging import logging
 from notify.server import NotifyWorker
 from .exceptions import ConfigError
-from .utils.json import json_encoder
+from datamodel.parsers.json import json_encoder
 from .conf import (
     NOFILES,
     WORKER_REDIS,
@@ -88,12 +88,15 @@ class SpawnProcess:
                 "QW Error: Port is already in use"
             )
         self._health_port = getattr(args, 'health_port', 8080)
+        # Shared state for observability (multiprocessing.Manager DictProxy)
+        self._manager = mp.Manager()
+        self._shared_state = self._manager.dict()
         for i in range(args.workers):
             try:
                 p = mp.Process(
                     target=start_server,
                     name=f'{self.worker}_{i}',
-                    args=(i, args.host, args.port, args.debug, args.notify_empty, self._health_port, )
+                    args=(i, args.host, args.port, args.debug, args.notify_empty, self._health_port, self._shared_state)
                 )
                 JOB_LIST.append(p)
                 p.start()
@@ -283,3 +286,7 @@ class SpawnProcess:
         except Exception as err:  # pylint: disable=W0703
             self.logger.exception(err)
             raise
+        try:
+            self._manager.shutdown()
+        except Exception:
+            pass

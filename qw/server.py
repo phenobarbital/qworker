@@ -39,8 +39,9 @@ from .conf import (
     WORKER_HEALTH_ENABLED,
     WORKER_HEALTH_PORT,
 )
-from .utils.json import json_encoder
+from datamodel.parsers.json import json_encoder
 from .utils.versions import get_versions
+from .state import StateTracker
 from .queues import QueueManager
 from .wrappers import (
     QueueWrapper
@@ -74,6 +75,7 @@ class QWorker:
             notify_empty_stream: bool = False,
             empty_stream_minutes: int = 5,
             health_port: int = WORKER_HEALTH_PORT,
+            shared_state=None,
     ):
         self.host = host
         self.port = port
@@ -90,6 +92,11 @@ class QWorker:
         self._server: Callable = None
         self._pid = os.getpid()
         self._protocol = protocol
+        self._shared_state = shared_state
+        self._state: Optional[StateTracker] = (
+            StateTracker(shared_state, worker_name=self._name, pid=self._pid)
+            if shared_state is not None else None
+        )
         # logging:
         self.logger = logging.getLogger(
             f'QW.Server:{self._name}.{self._id}'
@@ -239,15 +246,21 @@ class QWorker:
                                 self.logger.info(
                                     f':: TASK RECEIVED from Publish: {task} with id {task_id} at {int(time.time())}'
                                 )
+                                if self._state is not None:
+                                    self._state.task_executing(task_id, source="redis")
                                 try:
                                     executor = TaskExecutor(task)
                                     result = await executor.run()
                                     if isinstance(result, BaseException):
                                         raise result.__class__(str(result))
+                                    if self._state is not None:
+                                        self._state.task_completed(task_id, result="success", source="redis")
                                     self.logger.info(
                                         f":: TASK {task}.{task_id} was executed at {int(time.time())}"
                                     )
                                 except Exception as e:
+                                    if self._state is not None:
+                                        self._state.task_completed(task_id, result="error", source="redis")
                                     self.logger.error(
                                         f"Task {task}:{task_id} failed with error {e}"
                                     )
@@ -320,7 +333,7 @@ class QWorker:
         # Redis Service:
         self.start_redis()
         """Starts Queue Manager."""
-        self.queue = QueueManager(worker_name=self._name)
+        self.queue = QueueManager(worker_name=self._name, state_tracker=self._state)
         # Subscription Manager:
         self.subscription_task = self._loop.create_task(
             self.start_subscription()
@@ -485,6 +498,15 @@ class QWorker:
             writer=writer
         )
 
+    async def worker_info(self, writer: asyncio.StreamWriter):
+        """Return real-time task-state snapshot for the `info` TCP command."""
+        if self._state is not None:
+            state = self._state.get_state()
+        else:
+            state = {}
+        payload = json_encoder({self._name: state})
+        await self.closing_writer(writer, payload.encode('utf-8'))
+
     async def discard_task(self, message: str, writer: asyncio.StreamWriter):
         exc = DiscardedTask(
             message
@@ -516,7 +538,7 @@ class QWorker:
     ):
         prefix = None
         try:
-            prefix = await reader.readline()
+            prefix = (await reader.readline()).rstrip(b'\r\n')
             if not prefix:
                 # if no content on payload:
                 await self.response_keepalive(writer=writer)
@@ -540,6 +562,15 @@ class QWorker:
             await self.worker_check_state(
                 writer=writer
             )
+            return False
+        elif prefix == b'info':
+            # Only allow localhost connections for the info command
+            peer = writer.get_extra_info("peername")
+            peer_host = peer[0] if peer else ""
+            if peer_host in ("127.0.0.1", "::1", "localhost"):
+                await self.worker_info(writer=writer)
+            else:
+                await self.response_keepalive(writer=writer)
             return False
         else:
             try:
@@ -658,12 +689,19 @@ class QWorker:
                 )
         else:
             result = None
+            task_id = str(uid)
+            if self._state is not None:
+                self._state.task_executing(task_id, source="tcp")
             try:
                 # executed and send result to client
                 executor = TaskExecutor(task)
                 result = await executor.run()
+                if self._state is not None:
+                    self._state.task_completed(task_id, result="success", source="tcp")
                 return await self.return_result(writer, result, task, uid)
             except Exception as err:  # pylint: disable=W0703
+                if self._state is not None:
+                    self._state.task_completed(task_id, result="error", source="tcp")
                 try:
                     result = cloudpickle.dumps(err)
                 except Exception as ex:  # pylint: disable=W0703
@@ -762,7 +800,7 @@ class QWorker:
 
 
 ### Start Server ###
-def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health_port: int = WORKER_HEALTH_PORT):
+def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health_port: int = WORKER_HEALTH_PORT, shared_state=None):
     """thread worker function"""
     loop = None
     worker = None
@@ -782,6 +820,7 @@ def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health
             worker_id=num_worker,
             notify_empty_stream=notify_empty,
             health_port=health_port,
+            shared_state=shared_state,
         )
         loop.run_until_complete(
             worker.start()
