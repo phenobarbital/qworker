@@ -9,7 +9,7 @@ import struct
 from json import JSONDecodeError
 from navconfig.logging import logging
 from qw.exceptions import QWException
-from qw.utils.json import json_encoder, json_decoder
+from datamodel.parsers.encoders.json import json_encoder, json_decoder
 from .conf import (
     WORKER_DISCOVERY_HOST,
     WORKER_DEFAULT_MULTICAST,

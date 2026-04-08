@@ -1,41 +1,81 @@
 [build-system]
-requires = [
-    'setuptools==67.6.1',
-    'Cython==3.0.11',
-    'wheel==0.44.0',
-    'flit'
-]
-
+requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.flit.metadata]
-module = "qw"
-author = "Jesus Lara Gimenez"
-author-email = "jesuslarag@gmail.com"
-home-page = "https://github.com/phenobarbital/qworker"
-license = "MIT"
-keywords = "distributed objects, workers, asyncio, task queue, RPC, remote method call"
-classifiers=[
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Developers",
-  "Intended Audience :: System Administrators",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python",
-  "Typing :: Typed",
-  "Environment :: Web Environment",
-  "Framework :: AsyncIO",
-  "Topic :: Software Development :: Libraries :: Application Frameworks",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Software Development :: Build Tools",
-  "License :: OSI Approved :: MIT License",
+[project]
+name = "qworker"
+dynamic = ["version"]
+description = "QueueWorker is asynchronous Task Queue implementation built on top of Asyncio."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Jesus Lara", email = "jesuslarag@gmail.com"}
 ]
-description-file = "README.md"
-requires-python = ">=3.9.16"
+keywords = ["distributed objects", "workers", "asyncio", "task queue", "RPC"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python",
+    "Typing :: Typed",
+    "Environment :: Web Environment",
+    "Framework :: AsyncIO",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Object Brokering",
+    "Topic :: System :: Distributed Computing",
+    "Topic :: System :: Networking",
+    "License :: OSI Approved :: MIT License",
+]
+
+dependencies = [
+    "ciso8601>=2.2.0",
+    "navconfig[uvloop,default]>=1.7.9",
+    "asyncdb[default]>=2.9.0",
+    "async-notify[default]>=1.3.4",
+    "cloudpickle>=3.0.0",
+    "jsonpickle>=3.0.2",
+    "beautifulsoup4>=4.12.3",
+    "async-timeout>=4.0.3",
+    "msgpack>=1.1.0",
+    "aiormq>=6.9.2",
+]
+
+[project.optional-dependencies]
+tasks = ["flowtask>=5.8.20"]
+data = [
+    "modin>=0.32.0",
+    "dask[complete]>=2024.8.0",
+]
+
+[project.scripts]
+qw = "qw.__main__:main"
+
+[project.urls]
+Source = "https://github.com/phenobarbital/qworker"
+Funding = "https://paypal.me/phenobarbital"
+
+[tool.setuptools.dynamic]
+version = {attr = "qw.version.__version__"}
+
+[tool.setuptools.packages.find]
+exclude = ["contrib", "docs", "tests", "settings"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.2.2",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "pylint>=3.0.0",
+    "mypy>=1.0.0",
+    "coverage>=7.0.0",
+]
 
 [tool.pytest.ini_options]
 addopts = [

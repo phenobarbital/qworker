@@ -5,7 +5,7 @@ import random
 import socket
 from qw.exceptions import QWException
 from qw.utils import cPrint
-from qw.utils.json import json_decoder
+from datamodel.parsers.encoders.json import json_decoder
 from .conf import (
     WORKER_DISCOVERY_PORT,
     WORKER_DEFAULT_PORT,

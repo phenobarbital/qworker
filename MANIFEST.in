@@ -1,4 +1,3 @@
-
 include LICENSE
 include CHANGELOG.md
 include README.md
@@ -7,4 +6,10 @@ graft qw
 graft docs
 graft tests
 global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyx
+global-exclude *.pxd
+global-exclude *.c
+global-exclude *.cpp
+global-exclude *.so
 prune docs/_build
