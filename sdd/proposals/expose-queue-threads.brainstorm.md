@@ -475,7 +475,7 @@ from qw.conf import (
 
 ## Open Questions
 
-- [ ] Should `rich` be added as a dependency for pretty CLI output, or keep it plain text with manual formatting? — *Owner: Jesus*
-- [ ] Should the `info` TCP command work without auth for localhost connections (convenience for local debugging)? — *Owner: Jesus*
-- [ ] What should `qw info` show when a worker process has crashed but its entry is still in the shared dict? Mark as "dead" or remove? — *Owner: Jesus*
-- [ ] Should the broker (RabbitMQ) state tracking be included in v1 or deferred to v2? — *Owner: Jesus*
+- [x] Should `rich` be added as a dependency for pretty CLI output, or keep it plain text with manual formatting? — *Owner: Jesus*: add rich
+- [x] Should the `info` TCP command work without auth for localhost connections (convenience for local debugging)? — *Owner: Jesus*: yes
+- [x] What should `qw info` show when a worker process has crashed but its entry is still in the shared dict? Mark as "dead" or remove? — *Owner: Jesus*: mark as "dead"
+- [x] Should the broker (RabbitMQ) state tracking be included in v1 or deferred to v2? — *Owner: Jesus*: included.

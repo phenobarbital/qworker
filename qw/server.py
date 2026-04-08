@@ -35,7 +35,9 @@ from .conf import (
     REDIS_WORKER_GROUP,
     WORKER_USE_STREAMS,
     WORKER_REDIS,
-    WORKER_QUEUE_SIZE
+    WORKER_QUEUE_SIZE,
+    WORKER_HEALTH_ENABLED,
+    WORKER_HEALTH_PORT,
 )
 from .utils.json import json_encoder
 from .utils.versions import get_versions
@@ -44,6 +46,7 @@ from .wrappers import (
     QueueWrapper
 )
 from .executor import TaskExecutor
+from .health import HealthServer
 
 DEFAULT_HOST = WORKER_DEFAULT_HOST or socket.gethostbyname(socket.gethostname())
 
@@ -69,13 +72,16 @@ class QWorker:
             debug: bool = False,
             protocol: Any = None,
             notify_empty_stream: bool = False,
-            empty_stream_minutes: int = 5
+            empty_stream_minutes: int = 5,
+            health_port: int = WORKER_HEALTH_PORT,
     ):
         self.host = host
         self.port = port
         self.debug = debug
         self.queue = None
         self._id = worker_id
+        self._health_port = health_port
+        self._health_server: Optional[HealthServer] = None
         self._running: bool = True
         self._notify_empty_stream = notify_empty_stream
         self._empty_stream_minutes = empty_stream_minutes
@@ -348,7 +354,20 @@ class QWorker:
             raise QWException(
                 f"Error: {err}"
             ) from err
-        # Getting Tasks Callback (run when task is consumed from Queue)
+        # Start HTTP health server (only on first worker to avoid port conflicts)
+        if WORKER_HEALTH_ENABLED and self._id == 0:
+            try:
+                self._health_server = HealthServer(
+                    queue=self.queue,
+                    host=self.host,
+                    port=self._health_port,
+                    worker_name=self._name,
+                )
+                await self._health_server.start()
+            except OSError as err:
+                self.logger.warning(
+                    f"Could not start health server on port {self._health_port}: {err}"
+                )
 
         # Serve requests until Ctrl+C is pressed
         try:
@@ -364,6 +383,12 @@ class QWorker:
             cPrint(
                 f'Shutting down worker {self.name!s}'
             )
+        # Stop health server first
+        if self._health_server is not None:
+            try:
+                await self._health_server.stop()
+            except Exception as err:
+                self.logger.error(f"Error stopping health server: {err}")
         try:
             # forcing close the queue
             await self.queue.empty_queue()
@@ -737,7 +762,7 @@ class QWorker:
 
 
 ### Start Server ###
-def start_server(num_worker, host, port, debug: bool, notify_empty: bool):
+def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health_port: int = WORKER_HEALTH_PORT):
     """thread worker function"""
     loop = None
     worker = None
@@ -755,7 +780,8 @@ def start_server(num_worker, host, port, debug: bool, notify_empty: bool):
             event_loop=loop,
             debug=debug,
             worker_id=num_worker,
-            notify_empty_stream=notify_empty
+            notify_empty_stream=notify_empty,
+            health_port=health_port,
         )
         loop.run_until_complete(
             worker.start()

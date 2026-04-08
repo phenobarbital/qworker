@@ -13,8 +13,8 @@ from qw.conf import (
     NOTIFY_DEFAULT_PORT,
     WORKER_DEFAULT_QTY,
     WORKER_QUEUE_SIZE,
-    WORKER_DISCOVERY_PORT
-
+    WORKER_DISCOVERY_PORT,
+    WORKER_HEALTH_PORT,
 )
 from .process import SpawnProcess
 from .utils import cPrint
@@ -88,6 +88,11 @@ def main():
         '--debug', action="store_true",
         default=False,
         help="Start workers in Debug Mode"
+    )
+    parser.add_argument(
+        '--health-port', dest='health_port', type=int,
+        default=WORKER_HEALTH_PORT,
+        help='HTTP port for health check endpoint (K8s probes)'
     )
     args = parser.parse_args()
     process = None

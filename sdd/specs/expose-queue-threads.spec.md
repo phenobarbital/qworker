@@ -3,7 +3,7 @@
 **Feature ID**: FEAT-002
 **Date**: 2026-04-08
 **Author**: Jesus Lara / Claude
-**Status**: draft
+**Status**: approved
 **Target version**: 1.15.0
 **Brainstorm**: `sdd/proposals/expose-queue-threads.brainstorm.md`
 

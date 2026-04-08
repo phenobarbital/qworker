@@ -87,12 +87,13 @@ class SpawnProcess:
             raise RuntimeError(
                 "QW Error: Port is already in use"
             )
+        self._health_port = getattr(args, 'health_port', 8080)
         for i in range(args.workers):
             try:
                 p = mp.Process(
                     target=start_server,
                     name=f'{self.worker}_{i}',
-                    args=(i, args.host, args.port, args.debug, args.notify_empty, )
+                    args=(i, args.host, args.port, args.debug, args.notify_empty, self._health_port, )
                 )
                 JOB_LIST.append(p)
                 p.start()

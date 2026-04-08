@@ -24,6 +24,10 @@ WORKER_RETRY_COUNT = config.getint('WORKER_RETRY_COUNT', fallback=2)
 WORKER_CONCURRENCY_NUMBER = config.getint('WORKER_CONCURRENCY_NUMBER', fallback=8)
 WORKER_TASK_TIMEOUT = config.getint('WORKER_TASK_TIMEOUT', fallback=30)
 
+## HTTP Health Check Server (for K8s readiness/liveness probes)
+WORKER_HEALTH_ENABLED = config.getboolean('WORKER_HEALTH_ENABLED', fallback=True)
+WORKER_HEALTH_PORT = config.getint('WORKER_HEALTH_PORT', fallback=8080)
+
 ## Queue Consumed Callback
 WORKER_QUEUE_CALLBACK = config.get(
     'WORKER_QUEUE_CALLBACK', fallback=None

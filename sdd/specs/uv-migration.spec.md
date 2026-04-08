@@ -25,7 +25,7 @@ This makes installation complex (requires a C compiler), CI slow (multi-Python m
 - Migrate `pyproject.toml` to a modern PEP 621-compliant format using `uv` as the package manager
 - Remove `setup.py` entirely (no more Cython build step)
 - Convert `qw/exceptions.pyx` to pure Python `qw/exceptions.py`
-- **Remove `qw/utils/json.pyx` entirely** — replace usages with `from datamodel.parsers.encoders.json import JSONContent` (already available via `python-datamodel` dependency)
+- **Remove `qw/utils/json.pyx` entirely** — replace usages with `from datamodel.parsers.json import JSONContent` (already available via `python-datamodel` dependency)
 - **Remove Cython completely** as a build/runtime dependency
 - Remove all Cython artifacts (`.pxd`, `.c`, `.cpp`, `.so` files)
 - Update `Makefile` to use `uv` commands, adapted from `ai-parrot/Makefile`
@@ -48,7 +48,7 @@ This makes installation complex (requires a C compiler), CI slow (multi-Python m
 
 This is a build-system migration, not a feature. The changes are:
 
-1. **Cython removal**: Convert `exceptions.pyx` to `.py`, delete `utils/json.pyx` entirely (replaced by `datamodel.parsers.encoders.json.JSONContent`), delete all `.pxd`/`.c`/`.cpp`/`.so` artifacts
+1. **Cython removal**: Convert `exceptions.pyx` to `.py`, delete `utils/json.pyx` entirely (replaced by `datamodel.parsers.json.JSONContent`), delete all `.pxd`/`.c`/`.cpp`/`.so` artifacts
 2. **Import rewiring**: Update `qw/protocols.py` and `qw/discovery.py` to import `JSONContent`/`json_encoder`/`json_decoder` from `datamodel` instead of `qw.utils.json`
 3. **pyproject.toml rewrite**: Full PEP 621 `[project]` table, `uv`-compatible, remove `setup.py`, Python `>=3.11`, `modin`/`dask` moved to `[data]` extra, `asyncio` removed
 4. **Makefile modernization**: Replace `pip` with `uv` commands
@@ -68,7 +68,7 @@ release.yml (simplified) ──→ uv build ──→ PyPI publish
 | Existing Component | Integration Type | Notes |
 |---|---|---|
 | `qw/exceptions.pyx` | replaced by | `qw/exceptions.py` (pure Python) |
-| `qw/utils/json.pyx` | **deleted** | Replaced by `datamodel.parsers.encoders.json.JSONContent` |
+| `qw/utils/json.pyx` | **deleted** | Replaced by `datamodel.parsers.json.JSONContent` |
 | `setup.py` | deleted | replaced by `pyproject.toml` |
 | `pyproject.toml` | rewritten | PEP 621 format |
 | `Makefile` | rewritten | `uv`-based commands |
@@ -91,7 +91,7 @@ JSON utilities change source — callers must update:
 from qw.utils.json import JSONContent, json_encoder, json_decoder
 
 # AFTER:
-from datamodel.parsers.encoders.json import JSONContent, json_encoder, json_decoder
+from datamodel.parsers.json import JSONContent, json_encoder, json_decoder
 ```
 
 ---
@@ -107,8 +107,8 @@ from datamodel.parsers.encoders.json import JSONContent, json_encoder, json_deco
 - **Paths**: `qw/utils/json.pyx` (delete), `qw/protocols.py`, `qw/discovery.py`
 - **Responsibility**:
   - Delete `qw/utils/json.pyx` entirely
-  - Update `qw/protocols.py:12` to import from `datamodel.parsers.encoders.json` instead of `qw.utils.json`
-  - Update `qw/discovery.py:8` to import from `datamodel.parsers.encoders.json` instead of `qw.utils.json`
+  - Update `qw/protocols.py:12` to import from `datamodel.parsers.json` instead of `qw.utils.json`
+  - Update `qw/discovery.py:8` to import from `datamodel.parsers.json` instead of `qw.utils.json`
 - **Depends on**: nothing (datamodel is already a dependency)
 
 ### Module 3: Cython Artifact Cleanup
@@ -174,7 +174,7 @@ from datamodel.parsers.encoders.json import JSONContent, json_encoder, json_deco
 | `test_exceptions_importable` | Module 1 | `from qw.exceptions import QWException, ConfigError, ParserError, DiscardedTask, ProcessNotFound` |
 | `test_exception_hierarchy` | Module 1 | All exceptions inherit from `QWException` which inherits from `Exception` |
 | `test_exception_attributes` | Module 1 | `QWException` has `message`, `status`, `stacktrace` attributes |
-| `test_json_from_datamodel` | Module 2 | `from datamodel.parsers.encoders.json import JSONContent, json_encoder, json_decoder` works |
+| `test_json_from_datamodel` | Module 2 | `from datamodel.parsers.json import JSONContent, json_encoder, json_decoder` works |
 | `test_protocols_json_import` | Module 2 | `qw/protocols.py` imports JSON utilities from `datamodel` successfully |
 
 ### Integration Tests
@@ -189,7 +189,7 @@ from datamodel.parsers.encoders.json import JSONContent, json_encoder, json_deco
 ## 5. Acceptance Criteria
 
 - [ ] `qw/exceptions.py` exists as pure Python, all exception classes have same API
-- [ ] `qw/utils/json.pyx` is deleted; callers use `datamodel.parsers.encoders.json` instead
+- [ ] `qw/utils/json.pyx` is deleted; callers use `datamodel.parsers.json` instead
 - [ ] No `.pyx`, `.pxd`, `.c`, `.cpp`, or `.so` files remain in the repository
 - [ ] No Cython dependency anywhere (build-system, setup_requires, install_requires)
 - [ ] `setup.py` is deleted
@@ -221,9 +221,9 @@ from qw.exceptions import ProcessNotFound   # defined in exceptions.pyx:39 (not 
 
 # These JSON imports MUST BE REPLACED (qw.utils.json is being removed):
 # OLD: from qw.utils.json import json_encoder, json_decoder  # qw/protocols.py:12
-# NEW: from datamodel.parsers.encoders.json import json_encoder, json_decoder
+# NEW: from datamodel.parsers.json import json_encoder, json_decoder
 # OLD: from qw.utils.json import json_decoder                # qw/discovery.py:8
-# NEW: from datamodel.parsers.encoders.json import json_decoder
+# NEW: from datamodel.parsers.json import json_decoder
 
 # datamodel is already used in the codebase:
 from datamodel import BaseModel              # used in: qw/broker/rabbit.py:11, qw/broker/pickle.py:6
@@ -255,7 +255,7 @@ class ProcessNotFound(QWException):         # line 39
 
 # qw/utils/json.pyx — TO BE DELETED (replaced by datamodel)
 # JSONContent, json_encoder, json_decoder available from:
-#   from datamodel.parsers.encoders.json import JSONContent, json_encoder, json_decoder
+#   from datamodel.parsers.json import JSONContent, json_encoder, json_decoder
 ```
 
 ### Current Build Files
@@ -283,8 +283,8 @@ __version__ = '1.13.2'
 | `qw/exceptions.py` | `qw/discovery.py` | `from qw.exceptions import` | `qw/discovery.py:6` |
 | `qw/exceptions.py` | `qw/utils/functions.py` | `from qw.exceptions import` | `qw/utils/functions.py:5` |
 | `qw/exceptions.py` | `qw/queues/manager.py` | `from qw.exceptions import` | `qw/queues/manager.py:20` |
-| `datamodel.parsers.encoders.json` | `qw/protocols.py` | `from datamodel...json import` | `qw/protocols.py:12` (to be updated) |
-| `datamodel.parsers.encoders.json` | `qw/discovery.py` | `from datamodel...json import` | `qw/discovery.py:8` (to be updated) |
+| `datamodel.parsers.json` | `qw/protocols.py` | `from datamodel...json import` | `qw/protocols.py:12` (to be updated) |
+| `datamodel.parsers.json` | `qw/discovery.py` | `from datamodel...json import` | `qw/discovery.py:8` (to be updated) |
 
 ### Does NOT Exist (Anti-Hallucination)
 - ~~`qw/exceptions.py`~~ — does not yet exist (only `.pyx` version exists)
@@ -306,7 +306,7 @@ __version__ = '1.13.2'
 
 ### Known Risks / Gotchas
 - **Compiled `.so` files in working trees**: Developers must clean old `.so` files or they'll shadow the new `.py` modules. The Makefile `clean` target should handle this.
-- **`datamodel` compatibility**: `JSONContent` from `datamodel.parsers.encoders.json` must be API-compatible with the old Cython version (same `encode`/`decode`/`dumps`/`loads` methods). This is confirmed since QWorker's Cython version was originally derived from datamodel.
+- **`datamodel` compatibility**: `JSONContent` from `datamodel.parsers.json` must be API-compatible with the old Cython version (same `encode`/`decode`/`dumps`/`loads` methods). This is confirmed since QWorker's Cython version was originally derived from datamodel.
 - **PyPI secret**: `release.yml` uses `secrets.QUEUEWORKER_TOKEN` — this must remain configured
 
 ### External Dependencies
@@ -334,10 +334,10 @@ All previously open questions have been resolved:
 - [x] **modin/dask**: Move to `[data]` optional extra — *Resolved*
 - [x] **Python version**: Bump to `>=3.11` — *Resolved*
 - [x] **asyncio backport**: Remove — *Resolved*
-- [x] **qw/utils/json**: Remove entirely, use `datamodel.parsers.encoders.json` — *Resolved*
+- [x] **qw/utils/json**: Remove entirely, use `datamodel.parsers.json` — *Resolved*
 
 Remaining:
-- [ ] Should `orjson` remain as a direct dependency or is it only needed transitively via `datamodel`? — *Owner: Jesus Lara*
+- [x] Should `orjson` remain as a direct dependency or is it only needed transitively via `datamodel`? — *Owner: Jesus Lara*: transitively via datamodel.
 
 ---
 
