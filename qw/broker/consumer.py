@@ -34,6 +34,8 @@ class BrokerConsumer(RabbitMQConnection):
         self._exchange_type = kwargs.get('exchange_type', 'topic')
         self._exchange_name = kwargs.get('exchange_name', 'navigator')
         self._queue_name = kwargs.get('queue_name', 'navigator')
+        # Pop state_tracker before passing kwargs to parent (prevent unknown kwarg errors)
+        self._state = kwargs.pop('state_tracker', None)
         super(BrokerConsumer, self).__init__(dsn, timeout, **kwargs)
         self.logger = logging.getLogger('BrokerConsumer')
         self._serializer = DataSerializer()
@@ -107,7 +109,8 @@ class BrokerConsumer(RabbitMQConnection):
                 consumer_callback=self.wrap_callback(
                     callback,
                     requeue_on_fail=requeue_on_fail,
-                    max_retries=max_retries
+                    max_retries=max_retries,
+                    state_tracker=self._state
                 ),
                 **kwargs
             )
