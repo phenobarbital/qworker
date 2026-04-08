@@ -262,7 +262,7 @@
       "feature_id": "FEAT-002",
       "feature": "expose-queue-threads",
       "spec": "sdd/specs/expose-queue-threads.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -272,7 +272,8 @@
       "parallelism_notes": "Requires TCP info command from TASK-011. Modifies __main__.py and creates qw/cli/ \u2014 no overlap with TASK-012/013.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-014-cli-info-command.md"
+      "file": "sdd/tasks/completed/TASK-014-cli-info-command.md",
+      "completed_at": "2026-04-08T00:00:00Z"
     },
     {
       "id": "TASK-015",

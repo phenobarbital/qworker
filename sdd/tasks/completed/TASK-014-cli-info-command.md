@@ -255,9 +255,9 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
-**Deviations from spec**: none | describe if any
+**Completed by**: Claude Code (sdd-worker)
+**Date**: 2026-04-08
+**Notes**: All acceptance criteria met. 8 tests pass. setup.py doesn't exist (removed in
+  FEAT-001) so rich was added to pyproject.toml dependencies instead. Backward compat
+  maintained: qw with no subcommand still starts server.
+**Deviations from spec**: `rich` added to pyproject.toml instead of setup.py (setup.py removed in FEAT-001).
