@@ -242,7 +242,7 @@
       "feature_id": "FEAT-002",
       "feature": "expose-queue-threads",
       "spec": "sdd/specs/expose-queue-threads.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "medium",
       "effort": "M",
       "depends_on": [
@@ -252,7 +252,8 @@
       "parallelism_notes": "Only modifies broker/consumer.py and broker/rabbit.py \u2014 no file overlap with TASK-010/011/012. Can run in parallel after TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-013-broker-state-instrumentation.md"
+      "file": "sdd/tasks/completed/TASK-013-broker-state-instrumentation.md",
+      "completed_at": "2026-04-08T00:00:00Z"
     },
     {
       "id": "TASK-014",

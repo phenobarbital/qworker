@@ -213,9 +213,10 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
+**Completed by**: Claude Code (sdd-worker)
+**Date**: 2026-04-08
+**Notes**: All acceptance criteria met. state_tracker popped from kwargs BEFORE super().__init__()
+  to prevent passing unknown kwarg to RabbitMQConnection. wrap_callback instruments with
+  task_executing before callback and task_completed after success or in except block.
 **Notes**:
 **Deviations from spec**: none | describe if any
