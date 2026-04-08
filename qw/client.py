@@ -587,3 +587,46 @@ class QClient:
             # logging.exception(f'Error receiving data from Worker Server: {err!s}')
             task_result = orjson.loads(serialized_result)
         return task_result
+
+    async def info(self) -> dict:
+        """Query worker state via TCP 'info' command.
+
+        Returns the aggregated task state dict from the worker including:
+        - worker metadata (name, pid, address)
+        - state dict with queue, tcp_executing, redis_executing, broker_executing,
+          and completed task lists
+
+        Note: The 'info' command is served without authentication for localhost
+        connections (same host as the worker). Remote connections require
+        signature authentication (see server.py signature_validation).
+
+        Returns:
+            dict: Worker state with "worker" and "state" keys.
+
+        Raises:
+            QWException: If the connection fails or response cannot be decoded.
+        """
+        task = 'info'
+        serialized_task = task.encode('utf-8')
+        # getting writer, reader
+        reader, writer = await self.get_worker_connection()
+        # send 'info' command to worker
+        await self.sendto_worker(serialized_task, writer=writer)
+        # read response
+        serialized_result = b''
+        try:
+            while True:
+                serialized_result += await reader.read(-1)
+                if reader.at_eof():
+                    break
+        except Exception as err:
+            raise QWException(str(err)) from err
+        finally:
+            await self.close(writer)
+        # info always returns JSON (not cloudpickle)
+        try:
+            return orjson.loads(serialized_result)
+        except Exception as err:
+            raise QWException(
+                f"Error parsing info response: {err}"
+            ) from err

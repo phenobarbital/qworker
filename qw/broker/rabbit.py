@@ -295,15 +295,24 @@ class RabbitMQConnection:
         self,
         callback: Callable[[aiormq.abc.DeliveredMessage, str], Awaitable[None]],
         requeue_on_fail: bool = False,
-        max_retries: int = 3
+        max_retries: int = 3,
+        state_tracker=None
     ) -> Callable:
         """
         Wrap the user-provided callback to handle message decoding and
         acknowledgment.
         """
         async def wrapped_callback(message: aiormq.abc.DeliveredMessage):
+            # Extract task_id from message properties for state tracking
+            properties = message.header.properties or aiormq.spec.Basic.Properties()
+            task_id = str(
+                getattr(properties, 'message_id', None)
+                or getattr(properties, 'correlation_id', None)
+                or id(message)
+            )
             try:
-                properties = message.header.properties or aiormq.spec.Basic.Properties()
+                if state_tracker:
+                    state_tracker.task_executing(task_id, source="broker")
                 body = await self.process_message(message.body, properties)
                 if asyncio.iscoroutinefunction(callback):
                     await callback(message, body)
@@ -311,10 +320,14 @@ class RabbitMQConnection:
                     callback(message, body)
                 # Acknowledge the message to indicate it has been processed
                 await self._channel.basic_ack(message.delivery_tag)
+                if state_tracker:
+                    state_tracker.task_completed(task_id, "success", source="broker")
                 self.logger.debug(
                     f"Message acknowledged: {message.delivery_tag}"
                 )
             except Exception as e:
+                if state_tracker:
+                    state_tracker.task_completed(task_id, "error", source="broker")
                 self.logger.warning(
                     f"Error processing message: {e}"
                 )

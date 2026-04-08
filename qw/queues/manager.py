@@ -32,7 +32,7 @@ class QueueManager:
     """base Class for all Queue Managers in Queue Worker.
     """
 
-    def __init__(self, worker_name: str):
+    def __init__(self, worker_name: str, state_tracker=None):
         self.logger = logging.getLogger('QW.Queue')
         self.worker_name = worker_name
         self.queue: asyncio.Queue = asyncio.Queue(
@@ -49,6 +49,8 @@ class QueueManager:
         self.logger.notice(
             f'Callback Queue: {self._callback!r}'
         )
+        # Optional StateTracker for task lifecycle observability
+        self._state = state_tracker
 
     async def task_callback(self, task, **kwargs):
         self.logger.info(
@@ -109,6 +111,9 @@ class QueueManager:
         """
         try:
             self.queue.put_nowait(task)
+            if self._state:
+                fn_name = self._state._get_function_name(task)
+                self._state.task_queued(str(task.id), fn_name)
             await asyncio.sleep(.1)
             self.logger.info(
                 f'Task {task!s} with id {id} was queued at {int(time.time())}'
@@ -142,6 +147,8 @@ class QueueManager:
             self.logger.info(
                 f"Task started {task} on {self.worker_name}"
             )
+            if self._state:
+                self._state.task_executing(str(task.id), source="queue")
             ### Process Task:
             try:
                 executor = TaskExecutor(task)
@@ -198,3 +205,6 @@ class QueueManager:
                 await self._callback(
                     task, result=result
                 )
+                if self._state:
+                    result_str = "error" if isinstance(result, BaseException) else "success"
+                    self._state.task_completed(str(task.id), result_str, source="queue")
