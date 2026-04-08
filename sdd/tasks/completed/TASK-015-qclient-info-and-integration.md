@@ -237,9 +237,10 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
-**Deviations from spec**: none | describe if any
+**Completed by**: Claude Code (sdd-worker)
+**Date**: 2026-04-08
+**Notes**: All acceptance criteria met. 8 integration tests pass (mocked TCP layer).
+  Full end-to-end tests (connecting to live worker) require a running instance — not
+  feasible in this environment. Tests use proper async mock pattern with at_eof tracking.
+**Deviations from spec**: Integration tests use mock TCP layer instead of live worker
+  (live worker not available in CI environment).
