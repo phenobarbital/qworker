@@ -180,7 +180,7 @@
       "feature_id": "FEAT-002",
       "feature": "expose-queue-threads",
       "spec": "sdd/specs/expose-queue-threads.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -190,7 +190,8 @@
       "parallelism_notes": "Modifies process.py and server.py to wire shared state \u2014 must follow TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-010-spawnprocess-manager.md"
+      "file": "sdd/tasks/completed/TASK-010-spawnprocess-manager.md",
+      "completed_at": "2026-04-08T00:00:00Z"
     },
     {
       "id": "TASK-011",

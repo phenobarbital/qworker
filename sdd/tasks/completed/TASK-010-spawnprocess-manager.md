@@ -177,9 +177,10 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
-**Deviations from spec**: none | describe if any
+**Completed by**: Claude Code (sdd-worker)
+**Date**: 2026-04-08
+**Notes**: All acceptance criteria met. Also fixed pre-existing broken import
+  `from .utils.json import json_encoder` → `from datamodel.parsers.json import json_encoder`
+  in both qw/process.py and qw/server.py (qw/utils/json.py was removed in FEAT-001).
+**Deviations from spec**: Minor — also fixed broken imports from FEAT-001 migration in
+  process.py and server.py (necessary for the files to work at all).
