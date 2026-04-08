@@ -225,9 +225,12 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
-**Deviations from spec**: none | describe if any
+**Completed by**: Claude Code (sdd-worker)
+**Date**: 2026-04-08
+**Notes**: All acceptance criteria met. Added StateTracker import, init in QWorker.__init__,
+  state_tracker passed to QueueManager in start(), TCP task instrumentation in
+  handle_queue_wrapper(), Redis task instrumentation in start_subscription(), worker_info()
+  method, and 'info' prefix dispatch in signature_validation() with localhost bypass.
+**Deviations from spec**: For remote 'info', signature auth reads an additional prefix+payload
+  after the 'info' line (different protocol framing than health/check_state which have no
+  additional data); this matches the spec's intent but uses a custom framing for remote auth.

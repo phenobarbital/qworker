@@ -200,7 +200,7 @@
       "feature_id": "FEAT-002",
       "feature": "expose-queue-threads",
       "spec": "sdd/specs/expose-queue-threads.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -211,7 +211,8 @@
       "parallelism_notes": "Core instrumentation of server.py \u2014 depends on shared state wiring from TASK-010 and StateTracker from TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-011-qworker-state-instrumentation.md"
+      "file": "sdd/tasks/completed/TASK-011-qworker-state-instrumentation.md",
+      "completed_at": "2026-04-08T00:00:00Z"
     },
     {
       "id": "TASK-012",
