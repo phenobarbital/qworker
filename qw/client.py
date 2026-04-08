@@ -591,17 +591,17 @@ class QClient:
     async def info(self) -> dict:
         """Query worker state via TCP 'info' command.
 
-        Returns the aggregated task state dict from the worker including:
-        - worker metadata (name, pid, address)
-        - state dict with queue, tcp_executing, redis_executing, broker_executing,
-          and completed task lists
+        Returns the aggregated task state for ALL worker processes including:
+        - server metadata (address, serving)
+        - workers dict mapping worker_name → state (queue, tcp_executing,
+          redis_executing, broker_executing, completed)
 
         Note: The 'info' command is served without authentication for localhost
         connections (same host as the worker). Remote connections require
         signature authentication (see server.py signature_validation).
 
         Returns:
-            dict: Worker state with "worker" and "state" keys.
+            dict: Server info with "server" and "workers" keys.
 
         Raises:
             QWException: If the connection fails or response cannot be decoded.

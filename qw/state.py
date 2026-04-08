@@ -222,3 +222,12 @@ class StateTracker:
         raw = self._state.get(self._worker_name, {})
         # Convert to plain dict (from Manager proxy mapping)
         return dict(raw)
+
+    def get_all_states(self) -> dict:
+        """Return state for ALL worker processes as a plain dict.
+
+        Returns:
+            dict: Mapping of worker_name → state dict for every worker
+            registered in the shared multiprocessing Manager dict.
+        """
+        return {name: dict(state) for name, state in self._state.items()}

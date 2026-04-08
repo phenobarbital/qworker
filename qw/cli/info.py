@@ -131,41 +131,52 @@ def _fmt_duration(secs: Optional[float]) -> str:
 # ---------------------------------------------------------------------------
 
 def render_text(data: dict) -> None:
-    """Render the worker state as rich tables grouped by source."""
-    worker = data.get("worker", {})
-    state = data.get("state", {})
+    """Render ALL workers' state as rich tables grouped by source."""
+    server = data.get("server", {})
+    workers = data.get("workers", {})
 
-    # Worker header
-    name = worker.get("name", "unknown")
-    pid = worker.get("pid", "?")
-    address = worker.get("address", ("?", "?"))
-    serving = worker.get("serving", "?")
-    is_dead = state.get("dead", False)
+    address = server.get("address", ("?", "?"))
+    serving = server.get("serving", "?")
 
-    status_text = "[bold red]DEAD[/bold red]" if is_dead else "[bold green]ALIVE[/bold green]"
+    # Server header
     console.print(
         Panel(
-            f"[bold cyan]{name}[/bold cyan]  pid=[yellow]{pid}[/yellow]  "
-            f"addr=[white]{address}[/white]  status={status_text}",
-            title="[bold]QWorker State[/bold]",
+            f"addr=[white]{address}[/white]  serving=[white]{serving}[/white]  "
+            f"processes=[yellow]{len(workers)}[/yellow]",
+            title="[bold]QWorker Server[/bold]",
             expand=False
         )
     )
 
-    # Task sections
-    sections = [
-        ("Asyncio Queue", state.get("queue", []), "queue"),
-        ("Direct TCP", state.get("tcp_executing", []), "tcp"),
-        ("Redis Streams", state.get("redis_executing", []), "redis"),
-        ("Broker (RabbitMQ)", state.get("broker_executing", []), "broker"),
-    ]
+    # Render each worker process
+    for name, state in workers.items():
+        pid = state.get("pid", "?")
+        is_dead = state.get("dead", False)
+        status_text = "[bold red]DEAD[/bold red]" if is_dead else "[bold green]ALIVE[/bold green]"
 
-    for section_title, tasks, _source in sections:
-        _render_task_table(section_title, tasks)
+        console.print(
+            Panel(
+                f"[bold cyan]{name}[/bold cyan]  pid=[yellow]{pid}[/yellow]  "
+                f"status={status_text}",
+                title=f"[bold]Worker: {name}[/bold]",
+                expand=False
+            )
+        )
 
-    # Completed tasks
-    completed = state.get("completed", [])
-    _render_completed_table(completed)
+        # Task sections
+        sections = [
+            ("Asyncio Queue", state.get("queue", []), "queue"),
+            ("Direct TCP", state.get("tcp_executing", []), "tcp"),
+            ("Redis Streams", state.get("redis_executing", []), "redis"),
+            ("Broker (RabbitMQ)", state.get("broker_executing", []), "broker"),
+        ]
+
+        for section_title, tasks, _source in sections:
+            _render_task_table(section_title, tasks)
+
+        # Completed tasks
+        completed = state.get("completed", [])
+        _render_completed_table(completed)
 
 
 def _render_task_table(title: str, tasks: list) -> None:

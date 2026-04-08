@@ -499,20 +499,22 @@ class QWorker:
         )
 
     async def worker_info(self, writer: asyncio.StreamWriter):
-        """Return real-time task-state snapshot for the `info` TCP command."""
+        """Return real-time task-state snapshot for the `info` TCP command.
+
+        Returns ALL worker processes' state from the shared Manager dict,
+        not just the one that handled this connection.
+        """
         if self._state is not None:
-            state = self._state.get_state()
+            workers = self._state.get_all_states()
         else:
-            state = {}
+            workers = {}
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
         payload = json_encoder({
-            "worker": {
-                "name": self._name,
-                "pid": self._pid,
+            "server": {
                 "address": self.server_address,
                 "serving": addrs,
             },
-            "state": state,
+            "workers": workers,
         })
         await self.closing_writer(writer, payload.encode('utf-8'))
 
