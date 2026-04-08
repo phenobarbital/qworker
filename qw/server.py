@@ -37,7 +37,7 @@ from .conf import (
     WORKER_REDIS,
     WORKER_QUEUE_SIZE
 )
-from .utils.json import json_encoder
+from datamodel.parsers.json import json_encoder
 from .utils.versions import get_versions
 from .queues import QueueManager
 from .wrappers import (
@@ -69,7 +69,8 @@ class QWorker:
             debug: bool = False,
             protocol: Any = None,
             notify_empty_stream: bool = False,
-            empty_stream_minutes: int = 5
+            empty_stream_minutes: int = 5,
+            shared_state=None
     ):
         self.host = host
         self.port = port
@@ -84,6 +85,7 @@ class QWorker:
         self._server: Callable = None
         self._pid = os.getpid()
         self._protocol = protocol
+        self._shared_state = shared_state
         # logging:
         self.logger = logging.getLogger(
             f'QW.Server:{self._name}.{self._id}'
@@ -737,7 +739,7 @@ class QWorker:
 
 
 ### Start Server ###
-def start_server(num_worker, host, port, debug: bool, notify_empty: bool):
+def start_server(num_worker, host, port, debug: bool, notify_empty: bool, shared_state=None):
     """thread worker function"""
     loop = None
     worker = None
@@ -755,7 +757,8 @@ def start_server(num_worker, host, port, debug: bool, notify_empty: bool):
             event_loop=loop,
             debug=debug,
             worker_id=num_worker,
-            notify_empty_stream=notify_empty
+            notify_empty_stream=notify_empty,
+            shared_state=shared_state
         )
         loop.run_until_complete(
             worker.start()

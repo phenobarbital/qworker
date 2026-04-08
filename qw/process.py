@@ -9,7 +9,7 @@ from redis import asyncio as aioredis
 from navconfig.logging import logging
 from notify.server import NotifyWorker
 from .exceptions import ConfigError
-from .utils.json import json_encoder
+from datamodel.parsers.json import json_encoder
 from .conf import (
     NOFILES,
     WORKER_REDIS,
@@ -87,12 +87,16 @@ class SpawnProcess:
             raise RuntimeError(
                 "QW Error: Port is already in use"
             )
+        # Create a multiprocessing Manager for shared state across worker processes.
+        # Must be created BEFORE mp.Process() calls so the shared dict is available.
+        self._manager = mp.Manager()
+        self._shared_state = self._manager.dict()
         for i in range(args.workers):
             try:
                 p = mp.Process(
                     target=start_server,
                     name=f'{self.worker}_{i}',
-                    args=(i, args.host, args.port, args.debug, args.notify_empty, )
+                    args=(i, args.host, args.port, args.debug, args.notify_empty, self._shared_state)
                 )
                 JOB_LIST.append(p)
                 p.start()
@@ -257,6 +261,11 @@ class SpawnProcess:
             raise
 
     def terminate(self):
+        # Shut down the shared-state Manager before stopping workers
+        try:
+            self._manager.shutdown()
+        except Exception:
+            pass
         for j in JOB_LIST:
             try:
                 j.terminate()
