@@ -15,7 +15,7 @@ from typing import Optional
 from navconfig.logging import logging
 
 from .queues import QueueManager
-from .utils.json import json_encoder
+from datamodel.parsers.json import json_encoder
 
 
 HTTP_200 = "200 OK"
