@@ -44,6 +44,7 @@ from .wrappers import (
     QueueWrapper
 )
 from .executor import TaskExecutor
+from .state import StateTracker
 
 DEFAULT_HOST = WORKER_DEFAULT_HOST or socket.gethostbyname(socket.gethostname())
 
@@ -86,6 +87,11 @@ class QWorker:
         self._pid = os.getpid()
         self._protocol = protocol
         self._shared_state = shared_state
+        # Create StateTracker if shared state is available
+        if shared_state is not None:
+            self._state = StateTracker(shared_state, self._name, self._pid)
+        else:
+            self._state = None
         # logging:
         self.logger = logging.getLogger(
             f'QW.Server:{self._name}.{self._id}'
@@ -236,14 +242,20 @@ class QWorker:
                                     f':: TASK RECEIVED from Publish: {task} with id {task_id} at {int(time.time())}'
                                 )
                                 try:
+                                    if self._state:
+                                        self._state.task_executing(str(task_id), source="redis")
                                     executor = TaskExecutor(task)
                                     result = await executor.run()
                                     if isinstance(result, BaseException):
                                         raise result.__class__(str(result))
+                                    if self._state:
+                                        self._state.task_completed(str(task_id), "success", source="redis")
                                     self.logger.info(
                                         f":: TASK {task}.{task_id} was executed at {int(time.time())}"
                                     )
                                 except Exception as e:
+                                    if self._state:
+                                        self._state.task_completed(str(task_id), "error", source="redis")
                                     self.logger.error(
                                         f"Task {task}:{task_id} failed with error {e}"
                                     )
@@ -316,7 +328,7 @@ class QWorker:
         # Redis Service:
         self.start_redis()
         """Starts Queue Manager."""
-        self.queue = QueueManager(worker_name=self._name)
+        self.queue = QueueManager(worker_name=self._name, state_tracker=self._state)
         # Subscription Manager:
         self.subscription_task = self._loop.create_task(
             self.start_subscription()
@@ -462,6 +474,31 @@ class QWorker:
             writer=writer
         )
 
+    async def worker_info(self, writer: asyncio.StreamWriter):
+        """Handle 'info' TCP command. Returns shared state as JSON."""
+        if self._state:
+            state = self._state.get_state()
+        else:
+            state = {
+                "pid": self._pid,
+                "queue": [],
+                "tcp_executing": [],
+                "redis_executing": [],
+                "broker_executing": [],
+                "completed": []
+            }
+        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        status = {
+            "worker": {
+                "name": self.name,
+                "address": self.server_address,
+                "serving": addrs,
+                "pid": self._pid,
+            },
+            "state": state
+        }
+        await self.response_keepalive(status=status, writer=writer)
+
     async def discard_task(self, message: str, writer: asyncio.StreamWriter):
         exc = DiscardedTask(
             message
@@ -517,6 +554,32 @@ class QWorker:
             await self.worker_check_state(
                 writer=writer
             )
+            return False
+        elif prefix == b'info':
+            # Allow unauthenticated access from localhost; require auth from remote.
+            addr = writer.get_extra_info("peername")
+            is_localhost = addr and addr[0] in ("127.0.0.1", "::1", "localhost")
+            if is_localhost:
+                await self.worker_info(writer=writer)
+                return False
+            # Remote 'info': requires signature auth.
+            # The next line sent by the remote client is the msglen of the signature payload.
+            try:
+                sig_prefix = await reader.readline()
+                msglen = int(sig_prefix)
+                payload = await reader.readexactly(msglen)
+            except (ValueError, asyncio.IncompleteReadError) as exc:
+                exc = ConnectionRefusedError('Connection unsecured, Closing now.')
+                result = cloudpickle.dumps(exc)
+                await self.closing_writer(writer, result)
+                return False
+            if self.check_signature(payload) is False:
+                exc = ConnectionRefusedError('Connection unsecured, Closing now.')
+                self.logger.error('Closing unsecured connection')
+                result = cloudpickle.dumps(exc)
+                await self.closing_writer(writer, result)
+                return False
+            await self.worker_info(writer=writer)
             return False
         else:
             try:
@@ -635,12 +698,19 @@ class QWorker:
                 )
         else:
             result = None
+            task_id = str(uid)
             try:
                 # executed and send result to client
+                if self._state:
+                    self._state.task_executing(task_id, source="tcp")
                 executor = TaskExecutor(task)
                 result = await executor.run()
+                if self._state:
+                    self._state.task_completed(task_id, "success", source="tcp")
                 return await self.return_result(writer, result, task, uid)
             except Exception as err:  # pylint: disable=W0703
+                if self._state:
+                    self._state.task_completed(task_id, "error", source="tcp")
                 try:
                     result = cloudpickle.dumps(err)
                 except Exception as ex:  # pylint: disable=W0703
