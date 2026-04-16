@@ -303,7 +303,7 @@
       "feature_id": "FEAT-003",
       "feature": "dynamic-queue-sizing",
       "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
@@ -311,7 +311,8 @@
       "parallelism_notes": "Config edits in qw/conf.py must land first so TASK-017 can import the new constants. Trivial edit but strictly sequential.",
       "assigned_to": null,
       "started_at": "2026-04-16T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-016-queue-grow-config.md"
+      "file": "sdd/tasks/completed/TASK-016-queue-grow-config.md",
+      "completed_at": "2026-04-16T00:00:00Z"
     },
     {
       "id": "TASK-017",
