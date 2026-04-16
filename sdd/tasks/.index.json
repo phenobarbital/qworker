@@ -295,6 +295,81 @@
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-015-qclient-info-and-integration.md",
       "completed_at": "2026-04-08T00:00:00Z"
+    },
+    {
+      "id": "TASK-016",
+      "slug": "queue-grow-config",
+      "title": "Add dynamic-queue-sizing config constants",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "pending",
+      "priority": "high",
+      "effort": "S",
+      "depends_on": [],
+      "parallel": false,
+      "parallelism_notes": "Config edits in qw/conf.py must land first so TASK-017 can import the new constants. Trivial edit but strictly sequential.",
+      "assigned_to": null,
+      "started_at": null,
+      "file": "sdd/tasks/active/TASK-016-queue-grow-config.md"
+    },
+    {
+      "id": "TASK-017",
+      "slug": "queue-size-policy",
+      "title": "Implement QueueSizePolicy dataclass + unit tests",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "pending",
+      "priority": "high",
+      "effort": "M",
+      "depends_on": [
+        "TASK-016"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Consumes the config constants from TASK-016 and produces the dataclass imported by TASK-018. Sequential per Worktree Strategy.",
+      "assigned_to": null,
+      "started_at": null,
+      "file": "sdd/tasks/active/TASK-017-queue-size-policy.md"
+    },
+    {
+      "id": "TASK-018",
+      "slug": "queue-manager-dynamic-sizing",
+      "title": "Integrate dynamic sizing into QueueManager",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "pending",
+      "priority": "high",
+      "effort": "L",
+      "depends_on": [
+        "TASK-016",
+        "TASK-017"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Modifies qw/queues/manager.py; depends on QueueSizePolicy from TASK-017. Tightly coupled \u2014 sequential per spec.",
+      "assigned_to": null,
+      "started_at": null,
+      "file": "sdd/tasks/active/TASK-018-queue-manager-dynamic-sizing.md"
+    },
+    {
+      "id": "TASK-019",
+      "slug": "observability-wiring",
+      "title": "Wire dynamic queue metrics into check_state + health + integration tests",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "pending",
+      "priority": "medium",
+      "effort": "M",
+      "depends_on": [
+        "TASK-018"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Requires QueueManager.snapshot() from TASK-018. Touches qw/server.py and qw/health.py; completes FEAT-003.",
+      "assigned_to": null,
+      "started_at": null,
+      "file": "sdd/tasks/active/TASK-019-observability-wiring.md"
     }
   ]
 }
