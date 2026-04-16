@@ -167,7 +167,7 @@
       "effort": "M",
       "depends_on": [],
       "parallel": false,
-      "parallelism_notes": "Foundation module \u2014 all other FEAT-002 tasks depend on this. Creates qw/state.py.",
+      "parallelism_notes": "Foundation module — all other FEAT-002 tasks depend on this. Creates qw/state.py.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-009-state-tracker.md",
@@ -187,7 +187,7 @@
         "TASK-009"
       ],
       "parallel": false,
-      "parallelism_notes": "Modifies process.py and server.py to wire shared state \u2014 must follow TASK-009.",
+      "parallelism_notes": "Modifies process.py and server.py to wire shared state — must follow TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-010-spawnprocess-manager.md",
@@ -208,7 +208,7 @@
         "TASK-010"
       ],
       "parallel": false,
-      "parallelism_notes": "Core instrumentation of server.py \u2014 depends on shared state wiring from TASK-010 and StateTracker from TASK-009.",
+      "parallelism_notes": "Core instrumentation of server.py — depends on shared state wiring from TASK-010 and StateTracker from TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-011-qworker-state-instrumentation.md",
@@ -229,7 +229,7 @@
         "TASK-011"
       ],
       "parallel": false,
-      "parallelism_notes": "Modifies queues/manager.py \u2014 depends on StateTracker (TASK-009) and QWorker passing it (TASK-011).",
+      "parallelism_notes": "Modifies queues/manager.py — depends on StateTracker (TASK-009) and QWorker passing it (TASK-011).",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-012-queue-manager-instrumentation.md",
@@ -249,7 +249,7 @@
         "TASK-009"
       ],
       "parallel": true,
-      "parallelism_notes": "Only modifies broker/consumer.py and broker/rabbit.py \u2014 no file overlap with TASK-010/011/012. Can run in parallel after TASK-009.",
+      "parallelism_notes": "Only modifies broker/consumer.py and broker/rabbit.py — no file overlap with TASK-010/011/012. Can run in parallel after TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-013-broker-state-instrumentation.md",
@@ -269,7 +269,7 @@
         "TASK-011"
       ],
       "parallel": false,
-      "parallelism_notes": "Requires TCP info command from TASK-011. Modifies __main__.py and creates qw/cli/ \u2014 no overlap with TASK-012/013.",
+      "parallelism_notes": "Requires TCP info command from TASK-011. Modifies __main__.py and creates qw/cli/ — no overlap with TASK-012/013.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-014-cli-info-command.md",
@@ -290,11 +290,90 @@
         "TASK-014"
       ],
       "parallel": false,
-      "parallelism_notes": "Final task \u2014 requires TCP info command (TASK-011) and CLI (TASK-014) to be functional for integration testing.",
+      "parallelism_notes": "Final task — requires TCP info command (TASK-011) and CLI (TASK-014) to be functional for integration testing.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-015-qclient-info-and-integration.md",
       "completed_at": "2026-04-08T00:00:00Z"
+    },
+    {
+      "id": "TASK-016",
+      "slug": "queue-grow-config",
+      "title": "Add dynamic-queue-sizing config constants",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "done",
+      "priority": "high",
+      "effort": "S",
+      "depends_on": [],
+      "parallel": false,
+      "parallelism_notes": "Config edits in qw/conf.py must land first so TASK-017 can import the new constants. Trivial edit but strictly sequential.",
+      "assigned_to": null,
+      "started_at": "2026-04-16T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-016-queue-grow-config.md",
+      "completed_at": "2026-04-16T00:00:00Z"
+    },
+    {
+      "id": "TASK-017",
+      "slug": "queue-size-policy",
+      "title": "Implement QueueSizePolicy dataclass + unit tests",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "done",
+      "priority": "high",
+      "effort": "M",
+      "depends_on": [
+        "TASK-016"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Consumes the config constants from TASK-016 and produces the dataclass imported by TASK-018. Sequential per Worktree Strategy.",
+      "assigned_to": null,
+      "started_at": "2026-04-16T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-017-queue-size-policy.md",
+      "completed_at": "2026-04-16T00:00:00Z"
+    },
+    {
+      "id": "TASK-018",
+      "slug": "queue-manager-dynamic-sizing",
+      "title": "Integrate dynamic sizing into QueueManager",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "done",
+      "priority": "high",
+      "effort": "L",
+      "depends_on": [
+        "TASK-016",
+        "TASK-017"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Modifies qw/queues/manager.py; depends on QueueSizePolicy from TASK-017. Tightly coupled — sequential per spec.",
+      "assigned_to": null,
+      "started_at": "2026-04-16T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-018-queue-manager-dynamic-sizing.md",
+      "completed_at": "2026-04-16T00:00:00Z"
+    },
+    {
+      "id": "TASK-019",
+      "slug": "observability-wiring",
+      "title": "Wire dynamic queue metrics into check_state + health + integration tests",
+      "feature_id": "FEAT-003",
+      "feature": "dynamic-queue-sizing",
+      "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
+      "status": "done",
+      "priority": "medium",
+      "effort": "M",
+      "depends_on": [
+        "TASK-018"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Requires QueueManager.snapshot() from TASK-018. Touches qw/server.py and qw/health.py; completes FEAT-003.",
+      "assigned_to": null,
+      "started_at": "2026-04-16T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-019-observability-wiring.md",
+      "completed_at": "2026-04-16T00:00:00Z"
     }
   ]
 }

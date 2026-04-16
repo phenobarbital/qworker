@@ -17,6 +17,18 @@ WORKER_DEFAULT_PORT = config.getint('WORKER_DEFAULT_PORT', fallback=8888)
 NOTIFY_DEFAULT_PORT = config.getint('NOTIFY_DEFAULT_PORT', fallback=8989)
 WORKER_DEFAULT_QTY = config.getint('WORKER_DEFAULT_QTY', fallback=4)
 WORKER_QUEUE_SIZE = config.getint('WORKER_QUEUE_SIZE', fallback=4)
+
+### Dynamic Queue Sizing
+WORKER_QUEUE_GROW_MARGIN = config.getint(
+    'WORKER_QUEUE_GROW_MARGIN', fallback=2
+)
+WORKER_QUEUE_WARN_THRESHOLD = float(
+    config.get('WORKER_QUEUE_WARN_THRESHOLD', fallback=0.80)
+)
+WORKER_QUEUE_SHRINK_COOLDOWN = config.getint(
+    'WORKER_QUEUE_SHRINK_COOLDOWN', fallback=30
+)
+
 RESOURCE_THRESHOLD = config.getint('RESOURCE_THRESHOLD', fallback=90)
 CHECK_RESOURCE_USAGE = config.getboolean('CHECK_RESOURCE_USAGE', fallback=True)
 WORKER_RETRY_INTERVAL = config.getint('WORKER_RETRY_INTERVAL', fallback=10)
