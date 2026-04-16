@@ -136,22 +136,31 @@ class HealthServer:
             return HTTP_404, body
 
     def _readiness(self) -> tuple[str, str]:
-        """Return 200 when the queue can accept work, 503 otherwise."""
-        queue_full = self._queue.full()
-        queue_size = self._queue.size()
+        """Return 200 when the queue can accept work, 503 otherwise.
+
+        Returns 503 only when the queue is at ceiling (base + grow_margin),
+        so a queue that is 'full' at base_size still returns 200 when grow
+        margin is available.
+        """
+        snap = self._queue.snapshot()
+        # At ceiling when size >= ceiling (no more room to grow)
+        at_ceiling = snap["size"] >= snap["ceiling"]
 
         body = json_encoder({
-            "status": "full" if queue_full else "ok",
+            "status": "full" if at_ceiling else "ok",
             "queue": {
-                "size": queue_size,
-                "full": queue_full,
+                "size": snap["size"],
+                "max_size": snap["max_size"],
+                "base_size": snap["base_size"],
+                "grow_margin": snap["grow_margin"],
+                "grow_events": snap["grow_events"],
+                "discard_events": snap["discard_events"],
+                "full": snap["full"],
             },
             "worker": self._worker_name,
         })
 
-        if queue_full:
-            return HTTP_503, body
-        return HTTP_200, body
+        return (HTTP_503 if at_ceiling else HTTP_200), body
 
     def _liveness(self) -> tuple[str, str]:
         """Always 200 — the process is alive."""

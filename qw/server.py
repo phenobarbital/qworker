@@ -35,7 +35,6 @@ from .conf import (
     REDIS_WORKER_GROUP,
     WORKER_USE_STREAMS,
     WORKER_REDIS,
-    WORKER_QUEUE_SIZE,
     WORKER_HEALTH_ENABLED,
     WORKER_HEALTH_PORT,
 )
@@ -476,6 +475,7 @@ class QWorker:
     async def worker_check_state(self, writer: asyncio.StreamWriter):
         ## TODO: add last executed task
         addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        snap = self.queue.snapshot()
         status = {
             "versions": get_versions(),
             "workers": WORKER_DEFAULT_QTY,
@@ -483,14 +483,12 @@ class QWorker:
                 "name": self.name,
                 "address": self.server_address,
                 "serving": addrs,
-                "redis": WORKER_REDIS
+                "redis": WORKER_REDIS,
             },
             "queue": {
-                "max_size": WORKER_QUEUE_SIZE,
-                "size": self.queue.size(),
-                "full": self.queue.full(),
+                **snap,
                 "empty": self.queue.empty(),
-                "consumers": len(self.queue.consumers)
+                "consumers": len(self.queue.consumers),
             },
         }
         await self.response_keepalive(
