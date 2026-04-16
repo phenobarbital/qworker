@@ -362,7 +362,7 @@
       "feature_id": "FEAT-003",
       "feature": "dynamic-queue-sizing",
       "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "medium",
       "effort": "M",
       "depends_on": [
@@ -372,7 +372,8 @@
       "parallelism_notes": "Requires QueueManager.snapshot() from TASK-018. Touches qw/server.py and qw/health.py; completes FEAT-003.",
       "assigned_to": null,
       "started_at": "2026-04-16T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-019-observability-wiring.md"
+      "file": "sdd/tasks/completed/TASK-019-observability-wiring.md",
+      "completed_at": "2026-04-16T00:00:00Z"
     }
   ]
 }
