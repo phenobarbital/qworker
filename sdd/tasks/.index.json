@@ -341,7 +341,7 @@
       "feature_id": "FEAT-003",
       "feature": "dynamic-queue-sizing",
       "spec": "sdd/specs/dynamic-queue-sizing.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -352,7 +352,8 @@
       "parallelism_notes": "Modifies qw/queues/manager.py; depends on QueueSizePolicy from TASK-017. Tightly coupled — sequential per spec.",
       "assigned_to": null,
       "started_at": "2026-04-16T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-018-queue-manager-dynamic-sizing.md"
+      "file": "sdd/tasks/completed/TASK-018-queue-manager-dynamic-sizing.md",
+      "completed_at": "2026-04-16T00:00:00Z"
     },
     {
       "id": "TASK-019",
