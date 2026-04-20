@@ -14,11 +14,6 @@ from redis import asyncio as aioredis
 from redis.exceptions import ResponseError, ConnectionError
 import cloudpickle
 from navconfig.logging import logging
-from flowtask.exceptions import (
-    TaskException,
-    TaskError,
-    TaskNotFound
-)
 from qw.exceptions import (
     QWException,
     ParserError,
