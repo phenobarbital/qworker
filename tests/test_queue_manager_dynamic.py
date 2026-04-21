@@ -76,6 +76,8 @@ class TestQueueManagerDynamic:
         assert set(snap.keys()) == {
             "size", "max_size", "base_size", "grow_margin",
             "ceiling", "grow_events", "discard_events", "full",
+            # Consumer health fields added in FEAT-004
+            "consumer_alive", "consumer_total", "respawn_events",
         }
 
     async def test_shrinks_after_cooldown(self, policy):

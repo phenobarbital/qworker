@@ -167,7 +167,7 @@
       "effort": "M",
       "depends_on": [],
       "parallel": false,
-      "parallelism_notes": "Foundation module — all other FEAT-002 tasks depend on this. Creates qw/state.py.",
+      "parallelism_notes": "Foundation module \u2014 all other FEAT-002 tasks depend on this. Creates qw/state.py.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-009-state-tracker.md",
@@ -187,7 +187,7 @@
         "TASK-009"
       ],
       "parallel": false,
-      "parallelism_notes": "Modifies process.py and server.py to wire shared state — must follow TASK-009.",
+      "parallelism_notes": "Modifies process.py and server.py to wire shared state \u2014 must follow TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-010-spawnprocess-manager.md",
@@ -208,7 +208,7 @@
         "TASK-010"
       ],
       "parallel": false,
-      "parallelism_notes": "Core instrumentation of server.py — depends on shared state wiring from TASK-010 and StateTracker from TASK-009.",
+      "parallelism_notes": "Core instrumentation of server.py \u2014 depends on shared state wiring from TASK-010 and StateTracker from TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-011-qworker-state-instrumentation.md",
@@ -229,7 +229,7 @@
         "TASK-011"
       ],
       "parallel": false,
-      "parallelism_notes": "Modifies queues/manager.py — depends on StateTracker (TASK-009) and QWorker passing it (TASK-011).",
+      "parallelism_notes": "Modifies queues/manager.py \u2014 depends on StateTracker (TASK-009) and QWorker passing it (TASK-011).",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-012-queue-manager-instrumentation.md",
@@ -249,7 +249,7 @@
         "TASK-009"
       ],
       "parallel": true,
-      "parallelism_notes": "Only modifies broker/consumer.py and broker/rabbit.py — no file overlap with TASK-010/011/012. Can run in parallel after TASK-009.",
+      "parallelism_notes": "Only modifies broker/consumer.py and broker/rabbit.py \u2014 no file overlap with TASK-010/011/012. Can run in parallel after TASK-009.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-013-broker-state-instrumentation.md",
@@ -269,7 +269,7 @@
         "TASK-011"
       ],
       "parallel": false,
-      "parallelism_notes": "Requires TCP info command from TASK-011. Modifies __main__.py and creates qw/cli/ — no overlap with TASK-012/013.",
+      "parallelism_notes": "Requires TCP info command from TASK-011. Modifies __main__.py and creates qw/cli/ \u2014 no overlap with TASK-012/013.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-014-cli-info-command.md",
@@ -290,7 +290,7 @@
         "TASK-014"
       ],
       "parallel": false,
-      "parallelism_notes": "Final task — requires TCP info command (TASK-011) and CLI (TASK-014) to be functional for integration testing.",
+      "parallelism_notes": "Final task \u2014 requires TCP info command (TASK-011) and CLI (TASK-014) to be functional for integration testing.",
       "assigned_to": null,
       "started_at": "2026-04-08T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-015-qclient-info-and-integration.md",
@@ -349,7 +349,7 @@
         "TASK-017"
       ],
       "parallel": false,
-      "parallelism_notes": "Modifies qw/queues/manager.py; depends on QueueSizePolicy from TASK-017. Tightly coupled — sequential per spec.",
+      "parallelism_notes": "Modifies qw/queues/manager.py; depends on QueueSizePolicy from TASK-017. Tightly coupled \u2014 sequential per spec.",
       "assigned_to": null,
       "started_at": "2026-04-16T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-018-queue-manager-dynamic-sizing.md",
@@ -374,6 +374,86 @@
       "started_at": "2026-04-16T00:00:00Z",
       "file": "sdd/tasks/completed/TASK-019-observability-wiring.md",
       "completed_at": "2026-04-16T00:00:00Z"
+    },
+    {
+      "id": "TASK-020",
+      "slug": "resilient-queue-handler",
+      "title": "Resilient queue_handler",
+      "feature_id": "FEAT-004",
+      "feature": "fix-qworker-queue-handler",
+      "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
+      "status": "done",
+      "priority": "high",
+      "effort": "M",
+      "depends_on": [],
+      "parallel": false,
+      "parallelism_notes": "Modifies qw/queues/manager.py, sequential with monitor.",
+      "assigned_to": null,
+      "started_at": null,
+      "file": "sdd/tasks/completed/TASK-020-resilient-queue-handler.md",
+      "completed_at": "2026-04-21T00:00:00Z"
+    },
+    {
+      "id": "TASK-021",
+      "slug": "consumer-monitor",
+      "title": "Consumer Monitor",
+      "feature_id": "FEAT-004",
+      "feature": "fix-qworker-queue-handler",
+      "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
+      "status": "done",
+      "priority": "high",
+      "effort": "M",
+      "depends_on": [
+        "TASK-020"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Modifies qw/queues/manager.py, sequential.",
+      "assigned_to": null,
+      "started_at": "2026-04-21T00:00:00Z",
+      "file": "sdd/tasks/active/TASK-021-consumer-monitor.md",
+      "completed_at": "2026-04-21T17:56:56.783184Z"
+    },
+    {
+      "id": "TASK-022",
+      "slug": "observability-wiring",
+      "title": "Wiring & Observability",
+      "feature_id": "FEAT-004",
+      "feature": "fix-qworker-queue-handler",
+      "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
+      "status": "done",
+      "priority": "medium",
+      "effort": "S",
+      "depends_on": [
+        "TASK-021"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Modifies qw/queues/manager.py, sequential.",
+      "assigned_to": null,
+      "started_at": "2026-04-21T17:56:56.783199Z",
+      "file": "sdd/tasks/completed/TASK-022-observability-wiring.md",
+      "completed_at": "2026-04-21T18:33:58.548841Z"
+    },
+    {
+      "id": "TASK-023",
+      "slug": "consumer-resilience-tests",
+      "title": "Consumer Resilience Tests",
+      "feature_id": "FEAT-004",
+      "feature": "fix-qworker-queue-handler",
+      "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
+      "status": "done",
+      "priority": "high",
+      "effort": "M",
+      "depends_on": [
+        "TASK-020",
+        "TASK-021",
+        "TASK-022"
+      ],
+      "parallel": false,
+      "parallelism_notes": "Requires all changes to be testable.",
+      "assigned_to": null,
+      "started_at": "2026-04-21T18:33:58.548863Z",
+      "file": "sdd/tasks/completed/TASK-023-consumer-resilience-tests.md",
+      "completed_at": "2026-04-21T18:39:55.992447Z"
     }
   ]
 }
