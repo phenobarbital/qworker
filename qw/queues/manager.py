@@ -257,6 +257,49 @@ class QueueManager:
             except Exception:
                 self.logger.exception("shrink_monitor error")
 
+    async def _consumer_monitor(self) -> None:
+        """Defense-in-depth: respawn any dead consumer tasks."""
+        while True:
+            try:
+                await asyncio.sleep(getattr(self, '_monitor_interval', 60.0))
+                alive = []
+                monitor_task = getattr(self, '_monitor_task', None)
+                for t in self.consumers:
+                    if t is monitor_task:
+                        alive.append(t)
+                        continue
+                    if t is self._shrink_task:
+                        # Also check shrink_task health
+                        if t.done():
+                            exc = t.exception() if not t.cancelled() else None
+                            self.logger.warning(
+                                f"_shrink_monitor died: {exc}, respawning"
+                            )
+                            new_t = asyncio.create_task(self._shrink_monitor())
+                            self._shrink_task = new_t
+                            alive.append(new_t)
+                            if hasattr(self, '_respawn_events'):
+                                self._respawn_events += 1
+                        else:
+                            alive.append(t)
+                        continue
+                    if t.done():
+                        exc = t.exception() if not t.cancelled() else None
+                        self.logger.warning(
+                            f"Consumer died: {exc}, respawning"
+                        )
+                        new_t = asyncio.create_task(self.queue_handler())
+                        alive.append(new_t)
+                        if hasattr(self, '_respawn_events'):
+                            self._respawn_events += 1
+                    else:
+                        alive.append(t)
+                self.consumers = alive
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                self.logger.exception("_consumer_monitor error")
+
     async def get(self) -> QueueWrapper:
         """get.
 
