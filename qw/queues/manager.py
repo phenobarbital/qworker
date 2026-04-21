@@ -285,7 +285,7 @@ class QueueManager:
                 executor = TaskExecutor(task)
                 result = await executor.run()
                 if isinstance(result, asyncio.TimeoutError):
-                    raise asyncio.TimeoutError(
+                    result = asyncio.TimeoutError(
                         f"Task {task} with id {task.id} was cancelled."
                     )
                 elif type(result) in (
@@ -296,7 +296,7 @@ class QueueManager:
                     TaskNotFound,
                     NotSupported
                 ):
-                    raise result
+                    pass
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.
                     if task.retry() is True:  # task was marked to retry
@@ -314,28 +314,21 @@ class QueueManager:
                             self.logger.warning(
                                 f"{task} Failed after {cnt} times. Discarding task."
                             )
-                            raise result
-                    else:
-                        raise result
                 self.logger.debug(
                     f'Consumed Task: {task} at {int(time.time())}'
                 )
-            except RuntimeError as exc:
-                result = exc
-                raise QWException(
-                    f"Error: {exc}"
-                ) from exc
             except Exception as exc:
-                self.logger.error(
-                    f"Task failed with error: {exc}"
-                )
-                raise
+                self.logger.error(f"Task {task} failed: {exc}")
+                result = exc
             finally:
                 ### Task Completed
                 self.queue.task_done()
-                await self._callback(
-                    task, result=result
-                )
+                try:
+                    await self._callback(
+                        task, result=result
+                    )
+                except Exception as cb_err:
+                    self.logger.error(f"Callback error for {task}: {cb_err}")
                 if self._state:
                     result_str = "error" if isinstance(result, BaseException) else "success"
                     self._state.task_completed(str(task.id), result_str, source="queue")
