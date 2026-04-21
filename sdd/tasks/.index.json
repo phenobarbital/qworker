@@ -420,7 +420,7 @@
       "feature_id": "FEAT-004",
       "feature": "fix-qworker-queue-handler",
       "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "medium",
       "effort": "S",
       "depends_on": [
@@ -430,7 +430,8 @@
       "parallelism_notes": "Modifies qw/queues/manager.py, sequential.",
       "assigned_to": null,
       "started_at": "2026-04-21T17:56:56.783199Z",
-      "file": "sdd/tasks/active/TASK-022-observability-wiring.md"
+      "file": "sdd/tasks/completed/TASK-022-observability-wiring.md",
+      "completed_at": "2026-04-21T18:33:58.548841Z"
     },
     {
       "id": "TASK-023",
@@ -439,7 +440,7 @@
       "feature_id": "FEAT-004",
       "feature": "fix-qworker-queue-handler",
       "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -450,7 +451,7 @@
       "parallel": false,
       "parallelism_notes": "Requires all changes to be testable.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-04-21T18:33:58.548863Z",
       "file": "sdd/tasks/active/TASK-023-consumer-resilience-tests.md"
     }
   ]
