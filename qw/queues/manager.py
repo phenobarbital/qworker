@@ -22,7 +22,8 @@ from ..conf import (
     WORKER_QUEUE_SIZE,
     WORKER_RETRY_INTERVAL,
     WORKER_RETRY_COUNT,
-    WORKER_QUEUE_CALLBACK
+    WORKER_QUEUE_CALLBACK,
+    WORKER_CONSUMER_MONITOR_INTERVAL
 )
 from ..executor import TaskExecutor
 from ..wrappers.base import QueueWrapper
@@ -63,6 +64,9 @@ class QueueManager:
         self._warn_active: bool = False
         # Reference to the shrink monitor task (populated by fire_consumers)
         self._shrink_task: asyncio.Task | None = None
+        self._respawn_events: int = 0
+        self._monitor_task: asyncio.Task | None = None
+        self._monitor_interval: float = float(WORKER_CONSUMER_MONITOR_INTERVAL)
 
     # ---------------- read-only accessors ----------------
 
@@ -89,6 +93,7 @@ class QueueManager:
             ceiling, grow_events, discard_events, full.
         """
         sz = self.queue.qsize()
+        alive = len([t for t in self.consumers if not t.done()])
         return {
             "size": sz,
             "max_size": self.max_size,
@@ -98,6 +103,9 @@ class QueueManager:
             "grow_events": self._policy.grow_events,
             "discard_events": self._policy.discard_events,
             "full": self.queue.full(),
+            "consumer_alive": alive,
+            "consumer_total": len(self.consumers),
+            "respawn_events": getattr(self, '_respawn_events', 0)
         }
 
     async def task_callback(self, task, **kwargs):
@@ -152,6 +160,8 @@ class QueueManager:
             self.consumers.append(task)
         self._shrink_task = asyncio.create_task(self._shrink_monitor())
         self.consumers.append(self._shrink_task)
+        self._monitor_task = asyncio.create_task(self._consumer_monitor())
+        # Not appending to consumers list since it monitors the list itself
 
     async def empty_queue(self) -> None:
         """Processing and shutting down the Queue."""
@@ -163,6 +173,11 @@ class QueueManager:
         for c in self.consumers:
             try:
                 c.cancel()
+            except asyncio.CancelledError:
+                pass
+        if self._monitor_task:
+            try:
+                self._monitor_task.cancel()
             except asyncio.CancelledError:
                 pass
 
