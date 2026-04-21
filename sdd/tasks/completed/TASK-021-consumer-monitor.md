@@ -89,7 +89,7 @@ class QueueManager:
 
 *(Agent fills this in when done)*
 
-**Completed by**: 
-**Date**: 
-**Notes**: 
-**Deviations from spec**: 
+**Completed by**: Claude
+**Date**: 2026-04-21
+**Notes**: Added _consumer_monitor coroutine to QueueManager that periodically checks self.consumers and respawns any tasks (including _shrink_task) that have finished (.done()), logging any exceptions, and increments self._respawn_events.
+**Deviations from spec**: Used getattr() for self._monitor_interval, self._monitor_task, and self._respawn_events so it doesn't crash before TASK-022 initializes them.
