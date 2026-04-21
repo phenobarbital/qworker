@@ -67,6 +67,8 @@ class QueueManager:
         self._respawn_events: int = 0
         self._monitor_task: asyncio.Task | None = None
         self._monitor_interval: float = float(WORKER_CONSUMER_MONITOR_INTERVAL)
+        # Emit a CRITICAL log every N respawns to flag potential crash-loops
+        self._respawn_alert_threshold: int = 5
 
     # ---------------- read-only accessors ----------------
 
@@ -90,10 +92,17 @@ class QueueManager:
 
         Returns:
             dict with keys: size, max_size, base_size, grow_margin,
-            ceiling, grow_events, discard_events, full.
+            ceiling, grow_events, discard_events, full,
+            consumer_alive, consumer_total, respawn_events.
+            consumer_alive / consumer_total count only queue_handler tasks
+            (the _shrink_task infrastructure task is excluded).
         """
         sz = self.queue.qsize()
-        alive = len([t for t in self.consumers if not t.done()])
+        # Exclude _shrink_task so counts reflect real consumer workers only
+        queue_handlers = [
+            t for t in self.consumers if t is not self._shrink_task
+        ]
+        alive = len([t for t in queue_handlers if not t.done()])
         return {
             "size": sz,
             "max_size": self.max_size,
@@ -104,8 +113,8 @@ class QueueManager:
             "discard_events": self._policy.discard_events,
             "full": self.queue.full(),
             "consumer_alive": alive,
-            "consumer_total": len(self.consumers),
-            "respawn_events": getattr(self, '_respawn_events', 0)
+            "consumer_total": len(queue_handlers),
+            "respawn_events": self._respawn_events,
         }
 
     async def task_callback(self, task, **kwargs):
@@ -169,17 +178,12 @@ class QueueManager:
             self.queue.get_nowait()
             self.queue.task_done()
         await self.queue.join()
-        # also: cancel the idle consumers (including shrink monitor):
+        # Cancel all consumers (including shrink monitor).
+        # task.cancel() never raises CancelledError — it returns True/False.
         for c in self.consumers:
-            try:
-                c.cancel()
-            except asyncio.CancelledError:
-                pass
+            c.cancel()
         if self._monitor_task:
-            try:
-                self._monitor_task.cancel()
-            except asyncio.CancelledError:
-                pass
+            self._monitor_task.cancel()
 
     # ---------------- rewritten put() ----------------
 
@@ -273,43 +277,58 @@ class QueueManager:
                 self.logger.exception("shrink_monitor error")
 
     async def _consumer_monitor(self) -> None:
-        """Defense-in-depth: respawn any dead consumer tasks."""
+        """Defense-in-depth: respawn any dead consumer tasks.
+
+        Runs on a background loop every ``_monitor_interval`` seconds.
+        Detects tasks in ``self.consumers`` (queue_handler and _shrink_task)
+        that have exited, logs the cause, and replaces them with fresh tasks.
+
+        Emits a CRITICAL log every ``_respawn_alert_threshold`` respawns to
+        surface persistent crash-loop conditions to operators.
+
+        Note: ``_monitor_task`` itself is never added to ``self.consumers``,
+        so this loop never attempts to respawn itself.
+        """
         while True:
             try:
-                await asyncio.sleep(getattr(self, '_monitor_interval', 60.0))
+                await asyncio.sleep(self._monitor_interval)
                 alive = []
-                monitor_task = getattr(self, '_monitor_task', None)
                 for t in self.consumers:
-                    if t is monitor_task:
-                        alive.append(t)
-                        continue
                     if t is self._shrink_task:
-                        # Also check shrink_task health
                         if t.done():
                             exc = t.exception() if not t.cancelled() else None
                             self.logger.warning(
-                                f"_shrink_monitor died: {exc}, respawning"
+                                "_shrink_monitor died: %s — respawning", exc
                             )
                             new_t = asyncio.create_task(self._shrink_monitor())
                             self._shrink_task = new_t
                             alive.append(new_t)
-                            if hasattr(self, '_respawn_events'):
-                                self._respawn_events += 1
+                            self._respawn_events += 1
                         else:
                             alive.append(t)
                         continue
                     if t.done():
                         exc = t.exception() if not t.cancelled() else None
                         self.logger.warning(
-                            f"Consumer died: {exc}, respawning"
+                            "Consumer died: %s — respawning", exc
                         )
                         new_t = asyncio.create_task(self.queue_handler())
                         alive.append(new_t)
-                        if hasattr(self, '_respawn_events'):
-                            self._respawn_events += 1
+                        self._respawn_events += 1
                     else:
                         alive.append(t)
                 self.consumers = alive
+                # Alert on sustained crash-loop activity
+                if (
+                    self._respawn_events > 0
+                    and self._respawn_events % self._respawn_alert_threshold == 0
+                ):
+                    self.logger.critical(
+                        "Consumer respawn count reached %d — possible crash loop"
+                        " on worker %s. Investigate immediately.",
+                        self._respawn_events,
+                        self.worker_name,
+                    )
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -344,7 +363,7 @@ class QueueManager:
                 result = await executor.run()
                 if isinstance(result, asyncio.TimeoutError):
                     result = asyncio.TimeoutError(
-                        f"Task {task} with id {task.id} was cancelled."
+                        "Task %s with id %s was cancelled." % (task, task.id)
                     )
                 elif type(result) in (
                     NotFound,
@@ -354,29 +373,40 @@ class QueueManager:
                     TaskNotFound,
                     NotSupported
                 ):
-                    pass
+                    # Log flowtask errors explicitly — consumer loop continues.
+                    self.logger.error(
+                        "Task %s failed with %s: %s",
+                        task, type(result).__name__, result
+                    )
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.
                     if task.retry() is True:  # task was marked to retry
                         if task.retries < WORKER_RETRY_COUNT - 1:
                             task.add_retries()
                             self.logger.warning(
-                                f"Task {task} failed. Retrying. Retry count: {task.retries}"
+                                "Task %s failed. Retrying. Retry count: %d",
+                                task, task.retries
                             )
                             # Wait some seconds before retrying.
                             await asyncio.sleep(WORKER_RETRY_INTERVAL)
                             await self.queue.put(task)
                             await asyncio.sleep(0.1)
                         else:
-                            cnt = WORKER_RETRY_COUNT
-                            self.logger.warning(
-                                f"{task} Failed after {cnt} times. Discarding task."
+                            self.logger.error(
+                                "Task %s permanently failed after %d retries"
+                                " — discarding.",
+                                task, WORKER_RETRY_COUNT
                             )
+                    else:
+                        self.logger.error(
+                            "Task %s failed (no retry configured): %s",
+                            task, result
+                        )
                 self.logger.debug(
-                    f'Consumed Task: {task} at {int(time.time())}'
+                    "Consumed Task: %s at %d", task, int(time.time())
                 )
             except Exception as exc:
-                self.logger.error(f"Task {task} failed: {exc}")
+                self.logger.error("Task %s failed: %s", task, exc)
                 result = exc
             finally:
                 ### Task Completed
@@ -386,7 +416,7 @@ class QueueManager:
                         task, result=result
                     )
                 except Exception as cb_err:
-                    self.logger.error(f"Callback error for {task}: {cb_err}")
+                    self.logger.error("Callback error for %s: %s", task, cb_err)
                 if self._state:
                     result_str = "error" if isinstance(result, BaseException) else "success"
                     self._state.task_completed(str(task.id), result_str, source="queue")
