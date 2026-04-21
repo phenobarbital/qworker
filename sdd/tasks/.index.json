@@ -440,7 +440,7 @@
       "feature_id": "FEAT-004",
       "feature": "fix-qworker-queue-handler",
       "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -452,7 +452,8 @@
       "parallelism_notes": "Requires all changes to be testable.",
       "assigned_to": null,
       "started_at": "2026-04-21T18:33:58.548863Z",
-      "file": "sdd/tasks/active/TASK-023-consumer-resilience-tests.md"
+      "file": "sdd/tasks/completed/TASK-023-consumer-resilience-tests.md",
+      "completed_at": "2026-04-21T18:39:55.992447Z"
     }
   ]
 }
