@@ -382,7 +382,7 @@
       "feature_id": "FEAT-004",
       "feature": "fix-qworker-queue-handler",
       "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [],
@@ -390,7 +390,8 @@
       "parallelism_notes": "Modifies qw/queues/manager.py, sequential with monitor.",
       "assigned_to": null,
       "started_at": null,
-      "file": "sdd/tasks/active/TASK-020-resilient-queue-handler.md"
+      "file": "sdd/tasks/completed/TASK-020-resilient-queue-handler.md",
+      "completed_at": "2026-04-21T00:00:00Z"
     },
     {
       "id": "TASK-021",

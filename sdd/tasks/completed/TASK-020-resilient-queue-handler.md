@@ -88,7 +88,7 @@ class QueueManager:
 
 *(Agent fills this in when done)*
 
-**Completed by**: 
-**Date**: 
-**Notes**: 
-**Deviations from spec**: 
+**Completed by**: Claude
+**Date**: 2026-04-21
+**Notes**: Wrapped queue_handler execution in try/except and prevented re-raising exceptions so the consumer loop survives errors. Also wrapped callback execution with try/except in finally block.
+**Deviations from spec**: None
