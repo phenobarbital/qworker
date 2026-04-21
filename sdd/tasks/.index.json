@@ -400,7 +400,7 @@
       "feature_id": "FEAT-004",
       "feature": "fix-qworker-queue-handler",
       "spec": "sdd/specs/fix-qworker-queue-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -409,7 +409,7 @@
       "parallel": false,
       "parallelism_notes": "Modifies qw/queues/manager.py, sequential.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-04-21T00:00:00Z",
       "file": "sdd/tasks/active/TASK-021-consumer-monitor.md"
     },
     {
