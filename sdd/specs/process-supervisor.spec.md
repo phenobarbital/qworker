@@ -328,13 +328,44 @@ Changes:
 - **Path**: `qw/health.py`
 - **Responsibility**: Report draining status in the `/health/ready` endpoint.
   A draining worker should return 503 so external load balancers also stop
-  routing to it.
-- **Depends on**: Module 4
+  routing to it. Expose a new `/supervisor/status` endpoint for Grafana
+  dashboards.
+- **Depends on**: Module 4, Module 2
 
 Changes:
+- `__init__()`: Accept an optional `shared_state` parameter (the
+  `Manager().dict()` proxy) so the health server can read all workers' status.
 - `_readiness()`: Check if worker status is "draining" (passed via
   QueueManager or a flag). If draining, return 503 with
   `"status": "draining"`.
+- `_route()`: Add route for `/supervisor/status`.
+- `_supervisor_status()`: New method. Reads `shared_state` and returns a JSON
+  response with per-worker info:
+  ```json
+  {
+    "workers": {
+      "Worker-8888_0": {
+        "pid": 12345,
+        "status": "healthy",
+        "heartbeat_age_s": 3.2,
+        "draining_since": null,
+        "task_ledger_depth": 2,
+        "queue_size": 1
+      },
+      "Worker-8888_1": {
+        "pid": 12346,
+        "status": "draining",
+        "heartbeat_age_s": 45.7,
+        "draining_since": "2026-04-23T14:30:00Z",
+        "task_ledger_depth": 0,
+        "queue_size": 3
+      }
+    }
+  }
+  ```
+  This endpoint is available on all workers (not just worker_id==0) since each
+  worker's HealthServer can read the shared state. However, only worker_id==0
+  runs the HealthServer by default, so in practice it is a single endpoint.
 
 ### Module 8: Tests
 - **Path**: `tests/test_supervisor.py` (new file),
@@ -365,6 +396,7 @@ Changes:
 | `test_supervisor_rescue_tasks_via_redis` | Module 5 | Orphaned ledger entries are pushed to Redis stream |
 | `test_supervisor_respawn_same_worker_id` | Module 5 | New process gets same worker_id as dead one |
 | `test_health_reports_draining` | Module 7 | `/health/ready` returns 503 when worker is draining |
+| `test_supervisor_status_endpoint` | Module 7 | `/supervisor/status` returns per-worker status JSON with heartbeat_age, draining_since, task_ledger_depth |
 
 ### Integration Tests
 
@@ -442,6 +474,8 @@ def sample_ledger_entry():
   documented.
 - [ ] `qw info` TCP command shows the new fields (heartbeat, status,
   draining_since) for each worker.
+- [ ] `/supervisor/status` HTTP endpoint returns per-worker status with
+  heartbeat age, draining_since, and task_ledger depth (for Grafana).
 
 ---
 
@@ -654,6 +688,7 @@ class DiscardedTask(QWException):                                      # line 47
 | `StateTracker.ledger_remove()` | `QueueManager.queue_handler()` | Called in `finally` block after task completion | `qw/queues/manager.py:411-422` |
 | `QWorker._is_draining()` | `shared_state[worker_name]["status"]` | Read check before queuing | `qw/server.py:771,679` |
 | `HealthServer._readiness()` | `QWorker._is_draining()` | Returns 503 when draining | `qw/health.py:138` |
+| `HealthServer._supervisor_status()` | `shared_state` (all workers) | Reads heartbeat/status/ledger for Grafana | `qw/health.py` (new) |
 
 ### Does NOT Exist (Anti-Hallucination)
 
@@ -676,6 +711,8 @@ class DiscardedTask(QWException):                                      # line 47
 - ~~`SUPERVISOR_CHECK_INTERVAL`~~ — not in `qw/conf.py`; must be added
 - ~~`SUPERVISOR_KILL_GRACE`~~ — not in `qw/conf.py`; must be added
 - ~~`QueueManager._is_draining()`~~ — does not exist; draining check is on QWorker
+- ~~`HealthServer._supervisor_status()`~~ — does not exist; must be added
+- ~~`HealthServer.__init__(shared_state=...)`~~ — current `__init__` does not accept `shared_state`; must be extended
 
 ---
 
@@ -769,10 +806,14 @@ No new external dependencies. All functionality uses:
   more duplicates)? — **Decision: Remove at dequeue time** (when
   `queue.get()` returns in `queue_handler`). This minimizes duplicate
   execution. Tasks that die mid-execution are lost (acceptable tradeoff).
-- [ ] Should the Supervisor expose its own HTTP endpoint for observability
-  (e.g., `/supervisor/status`)? — *Owner: Jesus*
-- [ ] Should rescued tasks be given a higher priority or marked as "rescued"
-  in the Redis stream so consumers can log/track them? — *Owner: Jesus*
+- [x] Should the Supervisor expose its own HTTP endpoint for observability
+  (e.g., `/supervisor/status`)? — **Decision: Yes.** Expose a
+  `/supervisor/status` endpoint on the health port. Returns per-worker status
+  (healthy/draining), heartbeat age, task_ledger depth, respawn count. Useful
+  for Grafana dashboards monitoring worker health.
+- [x] Should rescued tasks be given a higher priority or marked as "rescued"
+  in the Redis stream so consumers can log/track them? — **Decision: No.**
+  Rescued tasks are re-submitted as normal stream entries. No special marking.
 
 ---
 
@@ -781,3 +822,4 @@ No new external dependencies. All functionality uses:
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 0.1 | 2026-04-23 | Jesus Lara | Initial draft |
+| 0.2 | 2026-04-23 | Jesus Lara | Resolved open questions: add `/supervisor/status` endpoint for Grafana; no special marking for rescued tasks |
