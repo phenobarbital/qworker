@@ -20,6 +20,7 @@ from .conf import (
 )
 
 from .server import start_server
+from .supervisor import ProcessSupervisor
 
 JOB_LIST = []
 
@@ -127,6 +128,33 @@ class SpawnProcess:
                     f"Error Starting Notify Worker: {ex}"
                 )
                 raise
+
+        # FEAT-005: start the Process Supervisor AFTER all workers and
+        # the optional NotifyWorker have been spawned. The supervisor is
+        # a daemon thread, so it does not keep the process alive on its
+        # own. It reads heartbeats from `self._shared_state` and replaces
+        # dead or stuck workers in `JOB_LIST`.
+        self._supervisor: ProcessSupervisor | None = None
+        try:
+            self._supervisor = ProcessSupervisor(
+                shared_state=self._shared_state,
+                job_list=JOB_LIST,
+                worker_name_prefix=self.worker,
+                host=self.host,
+                port=self.port,
+                debug=self.debug,
+                notify_empty=args.notify_empty,
+                health_port=self._health_port,
+            )
+            self._supervisor.start()
+            self.logger.info("Process supervisor started")
+        except Exception as sup_err:
+            # Supervisor failure must not block worker startup; the
+            # workers can still serve traffic without automatic recovery.
+            self.logger.error(
+                f"Failed to start Process Supervisor: {sup_err}"
+            )
+            self._supervisor = None
 
     def start_notify_worker(
         self,
@@ -261,6 +289,18 @@ class SpawnProcess:
             raise
 
     def terminate(self):
+        # FEAT-005: stop the supervisor BEFORE killing workers so it
+        # does not interpret the intentional shutdown as a crash and try
+        # to respawn the workers we are tearing down.
+        if getattr(self, "_supervisor", None) is not None:
+            try:
+                self._supervisor.stop()
+                self._supervisor.join(timeout=5)
+                self.logger.info("Process supervisor stopped")
+            except Exception as sup_err:
+                self.logger.error(
+                    f"Error stopping Process Supervisor: {sup_err}"
+                )
         for j in JOB_LIST:
             try:
                 j.terminate()

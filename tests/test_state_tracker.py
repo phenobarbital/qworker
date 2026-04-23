@@ -1,4 +1,5 @@
 """Unit tests for qw/state.py — StateTracker class."""
+import time
 import pytest
 from multiprocessing import Manager
 from qw.state import StateTracker
@@ -221,40 +222,219 @@ class TestGetState:
         assert state["pid"] == 12345
 
     def test_get_state_contains_all_keys(self, tracker):
-        """get_state contains all expected keys."""
+        """get_state contains all expected keys (legacy + FEAT-005)."""
         state = tracker.get_state()
-        for key in ("pid", "queue", "tcp_executing", "redis_executing",
-                    "broker_executing", "completed"):
-            assert key in state
+        expected = (
+            # Legacy lifecycle fields
+            "pid", "queue", "tcp_executing", "redis_executing",
+            "broker_executing", "completed",
+            # FEAT-005 — process supervisor / heartbeat / task ledger
+            "heartbeat", "status", "draining_since", "task_ledger",
+        )
+        for key in expected:
+            assert key in state, f"missing key {key!r} in get_state()"
+
+
+class TestGetAllStates:
+    """Regression coverage for the `qw info` TCP command path.
+
+    `QWorker.worker_info()` forwards `StateTracker.get_all_states()` as
+    the JSON payload for the `info` command, so any new field added to
+    the state dict automatically appears in `qw info` output. These
+    tests pin that contract.
+    """
+
+    def test_get_all_states_returns_mapping_of_workers(self, shared_state):
+        # Two workers sharing the same Manager dict
+        t0 = StateTracker(shared_state, worker_name="W0", pid=1001)
+        t1 = StateTracker(shared_state, worker_name="W1", pid=1002)
+        assert set(t0.get_all_states().keys()) == {"W0", "W1"}
+
+    def test_get_all_states_exposes_feat005_fields(self, tracker):
+        """`qw info` must expose the new supervisor fields for each worker."""
+        all_states = tracker.get_all_states()
+        assert "TestWorker_0" in all_states
+        state = all_states["TestWorker_0"]
+        for key in (
+            "heartbeat", "status", "draining_since", "task_ledger",
+        ):
+            assert key in state, (
+                f"FEAT-005 field {key!r} missing from get_all_states() — "
+                "qw info command would not expose it"
+            )
+
+    def test_get_all_states_reflects_supervisor_writes(self, tracker):
+        """Supervisor updates to status/draining_since show up in `qw info`."""
+        tracker.set_status("draining", draining_since=1234567890.0)
+        tracker.update_heartbeat()
+        tracker.ledger_add("task-abc", "payload-b64")
+
+        all_states = tracker.get_all_states()
+        state = all_states["TestWorker_0"]
+        assert state["status"] == "draining"
+        assert state["draining_since"] == 1234567890.0
+        assert state["heartbeat"] > 0
+        assert len(state["task_ledger"]) == 1
+        assert state["task_ledger"][0]["task_id"] == "task-abc"
 
 
 class TestGetFunctionName:
     def test_func_wrapper_name(self, tracker):
-        """_get_function_name extracts name from FuncWrapper."""
+        """get_function_name extracts name from FuncWrapper."""
         from qw.wrappers.func import FuncWrapper
 
         async def my_function():
             pass
 
         wrapper = FuncWrapper(host="localhost", func=my_function, queued=True)
-        name = tracker._get_function_name(wrapper)
+        name = tracker.get_function_name(wrapper)
         assert name == "my_function"
 
     def test_task_wrapper_repr(self, tracker):
-        """_get_function_name falls back to repr for TaskWrapper."""
+        """get_function_name falls back to repr for TaskWrapper."""
         try:
             from qw.wrappers.di_task import TaskWrapper
         except Exception:
             pytest.skip("TaskWrapper not available in this environment (flowtask not configured)")
         wrapper = TaskWrapper(program="my_prog", task="my_task")
-        name = tracker._get_function_name(wrapper)
+        name = tracker.get_function_name(wrapper)
         assert "my_task" in name or "my_prog" in name
 
     def test_unknown_fallback(self, tracker):
-        """_get_function_name returns a string for unrecognized objects."""
+        """get_function_name returns a string for unrecognized objects."""
         # We can't test TaskWrapper fallback when flowtask isn't installed,
         # so test with a plain QueueWrapper instead.
         from qw.wrappers.base import QueueWrapper
         wrapper = QueueWrapper(queued=True)
-        name = tracker._get_function_name(wrapper)
+        name = tracker.get_function_name(wrapper)
         assert isinstance(name, str)
+
+    def test_legacy_private_alias_still_works(self, tracker):
+        """The old ``_get_function_name`` name keeps working for callers
+        that still use it."""
+        from qw.wrappers.base import QueueWrapper
+        wrapper = QueueWrapper(queued=True)
+        # Both names must resolve to the same callable.
+        assert tracker._get_function_name == tracker.get_function_name
+        assert isinstance(tracker._get_function_name(wrapper), str)
+
+
+# ======================================================================
+# FEAT-005 — Heartbeat / Status / Task Ledger tests (TASK-025)
+# ======================================================================
+
+
+class TestHeartbeat:
+    def test_initial_heartbeat_is_zero(self, tracker):
+        """Before update_heartbeat() is called, heartbeat is 0.0."""
+        assert tracker.get_heartbeat() == 0.0
+
+    def test_update_heartbeat_writes_timestamp(self, tracker):
+        """update_heartbeat() writes the current time to shared state."""
+        before = time.time()
+        tracker.update_heartbeat()
+        after = time.time()
+        hb = tracker.get_heartbeat()
+        assert before <= hb <= after
+
+    def test_update_heartbeat_is_idempotent(self, tracker):
+        """Multiple updates keep the most recent timestamp."""
+        tracker.update_heartbeat()
+        first = tracker.get_heartbeat()
+        time.sleep(0.01)
+        tracker.update_heartbeat()
+        second = tracker.get_heartbeat()
+        assert second >= first
+
+    def test_heartbeat_visible_in_shared_state(self, tracker, shared_state):
+        """Heartbeat is written to shared_state[worker_name]['heartbeat']."""
+        tracker.update_heartbeat()
+        d = dict(shared_state["TestWorker_0"])
+        assert "heartbeat" in d
+        assert d["heartbeat"] > 0
+
+
+class TestStatus:
+    def test_initial_status_is_healthy(self, tracker):
+        """Default status is 'healthy'."""
+        assert tracker.get_status() == "healthy"
+
+    def test_set_status_draining(self, tracker, shared_state):
+        """set_status('draining', ts) sets both status and draining_since."""
+        now = time.time()
+        tracker.set_status("draining", draining_since=now)
+        assert tracker.get_status() == "draining"
+        d = dict(shared_state["TestWorker_0"])
+        assert d["draining_since"] == now
+
+    def test_set_status_back_to_healthy_clears_draining_since(
+        self, tracker, shared_state
+    ):
+        """Clearing to healthy sets draining_since back to None."""
+        tracker.set_status("draining", draining_since=time.time())
+        tracker.set_status("healthy")
+        assert tracker.get_status() == "healthy"
+        d = dict(shared_state["TestWorker_0"])
+        assert d["draining_since"] is None
+
+    def test_status_initialized_in_shared_state(self, tracker, shared_state):
+        """status/draining_since keys exist after init."""
+        d = dict(shared_state["TestWorker_0"])
+        assert d["status"] == "healthy"
+        assert d["draining_since"] is None
+
+
+class TestTaskLedger:
+    def test_initial_ledger_is_empty(self, tracker, shared_state):
+        """task_ledger starts as an empty list."""
+        d = dict(shared_state["TestWorker_0"])
+        assert d["task_ledger"] == []
+
+    def test_ledger_add_single_entry(self, tracker, shared_state):
+        """ledger_add appends an entry with task_id/payload/enqueued_at."""
+        tracker.ledger_add("id-1", "payload-1")
+        d = dict(shared_state["TestWorker_0"])
+        assert len(d["task_ledger"]) == 1
+        entry = d["task_ledger"][0]
+        assert entry["task_id"] == "id-1"
+        assert entry["payload"] == "payload-1"
+        assert isinstance(entry["enqueued_at"], float)
+
+    def test_ledger_add_multiple_entries(self, tracker, shared_state):
+        """Multiple adds accumulate in order."""
+        tracker.ledger_add("id-1", "payload-1")
+        tracker.ledger_add("id-2", "payload-2")
+        d = dict(shared_state["TestWorker_0"])
+        assert len(d["task_ledger"]) == 2
+        assert d["task_ledger"][0]["task_id"] == "id-1"
+        assert d["task_ledger"][1]["task_id"] == "id-2"
+
+    def test_ledger_remove_by_task_id(self, tracker, shared_state):
+        """ledger_remove drops the matching entry, keeps the rest."""
+        tracker.ledger_add("id-1", "payload-1")
+        tracker.ledger_add("id-2", "payload-2")
+        tracker.ledger_remove("id-1")
+        d = dict(shared_state["TestWorker_0"])
+        assert len(d["task_ledger"]) == 1
+        assert d["task_ledger"][0]["task_id"] == "id-2"
+
+    def test_ledger_remove_nonexistent_is_noop(self, tracker, shared_state):
+        """Removing a missing task_id does not raise."""
+        tracker.ledger_add("id-1", "payload-1")
+        tracker.ledger_remove("does-not-exist")
+        d = dict(shared_state["TestWorker_0"])
+        assert len(d["task_ledger"]) == 1
+
+    def test_ledger_drain_returns_all_and_clears(self, tracker, shared_state):
+        """ledger_drain returns entries and empties the ledger."""
+        tracker.ledger_add("id-1", "payload-1")
+        tracker.ledger_add("id-2", "payload-2")
+        entries = tracker.ledger_drain()
+        assert len(entries) == 2
+        assert {e["task_id"] for e in entries} == {"id-1", "id-2"}
+        d = dict(shared_state["TestWorker_0"])
+        assert d["task_ledger"] == []
+
+    def test_ledger_drain_empty_returns_empty_list(self, tracker):
+        """Draining an empty ledger returns []."""
+        assert tracker.ledger_drain() == []

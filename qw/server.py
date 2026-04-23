@@ -32,6 +32,7 @@ from .conf import (
     WORKER_REDIS,
     WORKER_HEALTH_ENABLED,
     WORKER_HEALTH_PORT,
+    WORKER_HEARTBEAT_INTERVAL,
 )
 from datamodel.parsers.json import json_encoder
 from .utils.versions import get_versions
@@ -91,10 +92,13 @@ class QWorker:
             StateTracker(shared_state, worker_name=self._name, pid=self._pid)
             if shared_state is not None else None
         )
+        # FEAT-005: background heartbeat task — created in start()
+        self._heartbeat_task: Optional[asyncio.Task] = None
         # logging:
         self.logger = logging.getLogger(
             f'QW.Server:{self._name}.{self._id}'
         )
+        self._heartbeat_logger = logging.getLogger('QW.Heartbeat')
 
     @property
     def name(self):
@@ -323,6 +327,51 @@ class QWorker:
         except asyncio.CancelledError:
             pass
 
+    # ------------------------------------------------------------------
+    # FEAT-005: heartbeat loop and draining check
+    # ------------------------------------------------------------------
+
+    async def _heartbeat_loop(self) -> None:
+        """Periodically write a heartbeat timestamp to shared state.
+
+        Runs as an asyncio task (not a thread) for consistency with
+        other QWorker background coroutines. The supervisor thread in
+        the parent process reads this timestamp via StateTracker to
+        detect stuck workers.
+        """
+        while self._running:
+            try:
+                if self._state is not None:
+                    self._state.update_heartbeat()
+                await asyncio.sleep(WORKER_HEARTBEAT_INTERVAL)
+            except asyncio.CancelledError:
+                break
+            except Exception:  # pragma: no cover — defensive
+                self._heartbeat_logger.exception(
+                    "heartbeat error on %s", self._name
+                )
+                # Swallow errors so the loop keeps running; a one-off
+                # Manager proxy glitch must not kill the heartbeat.
+                try:
+                    await asyncio.sleep(WORKER_HEARTBEAT_INTERVAL)
+                except asyncio.CancelledError:
+                    break
+
+    def _is_draining(self) -> bool:
+        """Return True when this worker has been marked as draining.
+
+        Called synchronously from the hot path (connection_handler,
+        handle_queue_wrapper) before enqueueing tasks. When True, the
+        caller must reject the incoming task so the client retries on
+        another worker via SO_REUSEPORT.
+        """
+        if self._state is None:
+            return False
+        try:
+            return self._state.get_status() == "draining"
+        except Exception:  # pragma: no cover — defensive
+            return False
+
     async def start(self):
         # Redis Service:
         self.start_redis()
@@ -369,6 +418,11 @@ class QWorker:
                     host=self.host,
                     port=self._health_port,
                     worker_name=self._name,
+                    # FEAT-005: give the health server visibility into
+                    # every worker's state so /health/ready can report
+                    # draining, and /supervisor/status can expose a
+                    # per-worker snapshot for Grafana.
+                    shared_state=self._shared_state,
                 )
                 await self._health_server.start()
             except OSError as err:
@@ -379,6 +433,10 @@ class QWorker:
         # Serve requests until Ctrl+C is pressed
         try:
             await self.queue.fire_consumers()
+            # FEAT-005: start the heartbeat loop now that the queue
+            # consumers are running. The loop keeps ticking until
+            # self._running is set to False by shutdown().
+            self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
             async with self._server:
                 await self._server.serve_forever()
         except (RuntimeError, KeyboardInterrupt) as err:
@@ -390,6 +448,17 @@ class QWorker:
             cPrint(
                 f'Shutting down worker {self.name!s}'
             )
+        # FEAT-005: cancel the heartbeat loop so it does not keep the
+        # event loop alive after shutdown begins.
+        if self._heartbeat_task is not None:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as hb_err:  # pragma: no cover — defensive
+                self.logger.error(f"Heartbeat task shutdown error: {hb_err}")
+            self._heartbeat_task = None
         # Stop health server first
         if self._health_server is not None:
             try:
@@ -674,6 +743,18 @@ class QWorker:
         # Set Debug level of task:
         task.debug = self.debug
         if task.queued is True:
+            # FEAT-005: reject new queued tasks when the supervisor has
+            # marked this worker as draining. The client receives a
+            # serialized QWException and can retry; SO_REUSEPORT will
+            # re-route the next TCP connection to a healthy sibling.
+            if self._is_draining():
+                result = cloudpickle.dumps(
+                    QWException(
+                        f"Worker {self.name!s} is draining, retry on another worker"
+                    )
+                )
+                await self.closing_writer(writer, result)
+                return False
             try:
                 task.id = uid
                 await self.queue.put(
@@ -682,6 +763,16 @@ class QWorker:
                 result = f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
                 return await self.return_result(writer, result, task, uid)
             except asyncio.QueueFull as ex:
+                # FEAT-005 TOCTOU note: this branch catches two
+                # distinct conditions that share the same exception
+                # type. (1) the queue is genuinely at ceiling capacity,
+                # or (2) the worker status flipped to "draining"
+                # between the `_is_draining()` check above and the
+                # `queue.put()` call — in which case the draining guard
+                # inside QueueManager.put raises QueueFull with
+                # "...is draining" in the message. Both cases correctly
+                # reject the task; only the diagnostic wording is
+                # slightly misleading for the draining race.
                 return await self.queue_full(
                     message=f"Queue in {self.name!s} is Full, discarding Task {task!r}",
                     writer=writer
@@ -766,12 +857,29 @@ class QWorker:
                     result = await executor.run()
                     return await self.return_result(writer, result, task, task_uuid)
                 else:
+                    # FEAT-005: same draining guard as handle_queue_wrapper
+                    # — reject new queued tasks so the client retries
+                    # and is re-routed via SO_REUSEPORT.
+                    if self._is_draining():
+                        result = cloudpickle.dumps(
+                            QWException(
+                                f"Worker {self.name!s} is draining, retry on another worker"
+                            )
+                        )
+                        await self.closing_writer(writer, result)
+                        return False
                     # put work in Queue:
                     try:
                         await self.queue.put(task, id=task_uuid)
                         result = f'Task {task!s} was Queued.'.encode('utf-8')
                         return await self.return_result(writer, result, task, task_uuid)
                     except asyncio.QueueFull as exc:
+                        # See FEAT-005 TOCTOU note above in
+                        # handle_queue_wrapper — a race can also flip
+                        # status to "draining" between the
+                        # `_is_draining()` check and this put(), which
+                        # surfaces here as QueueFull with
+                        # "...is draining" in the message.
                         return await self.queue_full(
                             message=f'Queue Full, Task {task!s} was discarded',
                             writer=writer
