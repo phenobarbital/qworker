@@ -500,7 +500,7 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -510,7 +510,8 @@
       "parallelism_notes": "Modifies qw/queues/manager.py \u2014 depends on StateTracker ledger methods from TASK-025.",
       "assigned_to": null,
       "started_at": "2026-04-22T23:42:05.054230+00:00",
-      "file": "sdd/tasks/active/TASK-026-queue-manager-ledger.md"
+      "file": "sdd/tasks/completed/TASK-026-queue-manager-ledger.md",
+      "completed_at": "2026-04-23T00:34:15.906922+00:00"
     },
     {
       "id": "TASK-027",

@@ -231,10 +231,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Modified `qw/queues/manager.py` with three changes: (1) added `cloudpickle` + `base64` imports at top; (2) added draining-guard at top of `put()` — when `self._state.get_status() == "draining"`, raises `asyncio.QueueFull("Worker ... is draining")` before any queue logic; (3) added `ledger_add(str(task.id), serialized)` after successful `put_nowait()`, using cloudpickle+base64 serialization (same as the Redis stream path); (4) added `ledger_remove(str(task.id))` in `queue_handler()` immediately after `queue.get()` returns (dequeue time, not completion time). Both ledger operations wrapped in try/except so ledger failures cannot block task execution. Draining status read is also defensive — only QueueFull propagates, any other exception is logged and the worker keeps accepting. Created `tests/test_queue_manager_ledger.py` with 8 new tests covering draining guard (4) and ledger integration (4). Full run: 90 passed, 1 skipped (pre-existing).
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
