@@ -275,10 +275,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Extended `StateTracker.__init__` with 4 new fields (`heartbeat`, `status`, `draining_since`, `task_ledger`). Added 7 new methods following the Manager-proxy full-value-replacement pattern: `update_heartbeat`, `set_status`, `get_heartbeat`, `get_status`, `ledger_add`, `ledger_remove`, `ledger_drain`. Added 15 new unit tests across 3 test classes (`TestHeartbeat`, `TestStatus`, `TestTaskLedger`). Full `tests/test_state_tracker.py` run: 45 passed, 1 skipped (pre-existing TaskWrapper skip due to flowtask not installed).
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none

@@ -480,7 +480,7 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -490,7 +490,8 @@
       "parallelism_notes": "Extends qw/state.py \u2014 data layer for heartbeat, status, ledger. Required by TASK-026, TASK-027, TASK-028.",
       "assigned_to": null,
       "started_at": "2026-04-22T23:42:05.054230+00:00",
-      "file": "sdd/tasks/active/TASK-025-state-tracker-extensions.md"
+      "file": "sdd/tasks/completed/TASK-025-state-tracker-extensions.md",
+      "completed_at": "2026-04-23T00:30:14.145292+00:00"
     },
     {
       "id": "TASK-026",
