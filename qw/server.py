@@ -418,6 +418,11 @@ class QWorker:
                     host=self.host,
                     port=self._health_port,
                     worker_name=self._name,
+                    # FEAT-005: give the health server visibility into
+                    # every worker's state so /health/ready can report
+                    # draining, and /supervisor/status can expose a
+                    # per-worker snapshot for Grafana.
+                    shared_state=self._shared_state,
                 )
                 await self._health_server.start()
             except OSError as err:
