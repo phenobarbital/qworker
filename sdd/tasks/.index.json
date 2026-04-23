@@ -562,7 +562,7 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [
@@ -572,7 +572,8 @@
       "parallelism_notes": "Wires supervisor into SpawnProcess \u2014 must follow TASK-028 (ProcessSupervisor class).",
       "assigned_to": null,
       "started_at": "2026-04-22T23:42:05.054230+00:00",
-      "file": "sdd/tasks/active/TASK-029-spawnprocess-integration.md"
+      "file": "sdd/tasks/completed/TASK-029-spawnprocess-integration.md",
+      "completed_at": "2026-04-23T01:49:01.783217+00:00"
     },
     {
       "id": "TASK-030",
