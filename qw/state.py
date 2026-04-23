@@ -35,18 +35,25 @@ class StateTracker:
             "tcp_executing": [],
             "redis_executing": [],
             "broker_executing": [],
-            "completed": []
+            "completed": [],
+            # Supervisor / heartbeat fields (FEAT-005)
+            "heartbeat": 0.0,
+            "status": "healthy",
+            "draining_since": None,
+            "task_ledger": [],
         }
 
     # ------------------------------------------------------------------
     # Helper: function name extraction
     # ------------------------------------------------------------------
 
-    def _get_function_name(self, task) -> str:
+    def get_function_name(self, task) -> str:
         """Extract a human-readable function name from a task wrapper.
 
-        Checks isinstance in order: FuncWrapper first (has .func attribute),
-        then falls back to repr(), then '<unknown>'.
+        Public helper used by :class:`qw.queues.manager.QueueManager`
+        when logging queued tasks. Checks isinstance in order: FuncWrapper
+        first (has .func attribute), then falls back to repr(), then
+        '<unknown>'.
         """
         # Lazy imports to avoid circular dependencies; these are only used
         # for isinstance checks and the import is cheap after first load.
@@ -76,6 +83,11 @@ class StateTracker:
             pass
 
         return "<unknown>"
+
+    # Backwards-compatibility alias for the previously-private name.
+    # External callers (e.g. older integrations) may still reference
+    # ``_get_function_name``. Prefer :meth:`get_function_name` in new code.
+    _get_function_name = get_function_name
 
     # ------------------------------------------------------------------
     # Source-list mapping
@@ -231,3 +243,113 @@ class StateTracker:
             registered in the shared multiprocessing Manager dict.
         """
         return {name: dict(state) for name, state in self._state.items()}
+
+    # ------------------------------------------------------------------
+    # FEAT-005: Heartbeat, status, and task ledger
+    # ------------------------------------------------------------------
+
+    def update_heartbeat(self) -> None:
+        """Write the current timestamp to this worker's heartbeat field.
+
+        Called periodically by the worker's async heartbeat loop. The
+        supervisor thread (in the parent process) reads this value to
+        detect stuck workers.
+        """
+        d = dict(self._state[self._worker_name])
+        d["heartbeat"] = time.time()
+        self._state[self._worker_name] = d
+
+    def set_status(self, status: str, draining_since: float | None = None) -> None:
+        """Set this worker's status ("healthy" or "draining").
+
+        Called by the supervisor (from the parent process) to transition a
+        worker between healthy and draining states. When setting status to
+        "draining", the caller should pass `draining_since=time.time()` so
+        the supervisor can compute drain timeout. When restoring to
+        "healthy", pass `draining_since=None`.
+
+        Args:
+            status: "healthy" or "draining".
+            draining_since: Timestamp when draining started, or None when
+                clearing (status back to healthy).
+        """
+        d = dict(self._state[self._worker_name])
+        d["status"] = status
+        d["draining_since"] = draining_since
+        self._state[self._worker_name] = d
+
+    def get_heartbeat(self) -> float:
+        """Return the last heartbeat timestamp for this worker.
+
+        Returns 0.0 if no heartbeat has been recorded yet. The supervisor
+        compares this against `time.time() - WORKER_HEARTBEAT_TIMEOUT` to
+        detect stale workers.
+        """
+        return dict(self._state[self._worker_name]).get("heartbeat", 0.0)
+
+    def get_status(self) -> str:
+        """Return this worker's current status string.
+
+        Returns "healthy" if no status has been set. The QWorker reads
+        this before accepting new queued tasks — a "draining" status
+        causes the worker to reject incoming tasks so clients retry on a
+        healthy worker via SO_REUSEPORT.
+        """
+        return dict(self._state[self._worker_name]).get("status", "healthy")
+
+    def ledger_add(self, task_id: str, payload: str) -> None:
+        """Append a serialized task entry to this worker's task ledger.
+
+        Called by QueueManager.put() after a task is enqueued. The
+        payload is a base64-encoded cloudpickle serialization of the
+        task, picklable through the Manager proxy. If the worker dies,
+        the supervisor reads the ledger and re-submits these tasks via
+        the Redis stream so they are not lost.
+
+        Args:
+            task_id: String UUID of the task.
+            payload: Base64-encoded cloudpickle dump of the task object.
+        """
+        d = dict(self._state[self._worker_name])
+        d["task_ledger"] = list(d.get("task_ledger", [])) + [{
+            "task_id": task_id,
+            "payload": payload,
+            "enqueued_at": time.time(),
+        }]
+        self._state[self._worker_name] = d
+
+    def ledger_remove(self, task_id: str) -> None:
+        """Remove a task entry from this worker's task ledger by id.
+
+        Called by QueueManager.queue_handler() as soon as the task is
+        dequeued (not on completion). This narrows the rescue window:
+        tasks in the ledger are guaranteed to still be in the queue,
+        which avoids duplicate execution if the worker dies mid-task.
+
+        Args:
+            task_id: String UUID of the task to remove.
+        """
+        d = dict(self._state[self._worker_name])
+        d["task_ledger"] = [
+            e for e in list(d.get("task_ledger", []))
+            if e.get("task_id") != task_id
+        ]
+        self._state[self._worker_name] = d
+
+    def ledger_drain(self) -> list[dict]:
+        """Read and clear the entire task ledger atomically.
+
+        Used by the supervisor during the rescue path. Returns all
+        entries still in the ledger, then replaces the ledger with an
+        empty list in a single Manager-proxy write.
+
+        Returns:
+            list[dict]: The ledger entries that were present before the
+            drain. Each entry has keys ``task_id``, ``payload``,
+            ``enqueued_at``.
+        """
+        d = dict(self._state[self._worker_name])
+        entries = list(d.get("task_ledger", []))
+        d["task_ledger"] = []
+        self._state[self._worker_name] = d
+        return [dict(e) for e in entries]

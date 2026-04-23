@@ -43,6 +43,13 @@ WORKER_TASK_TIMEOUT = config.getint('WORKER_TASK_TIMEOUT', fallback=30)
 WORKER_HEALTH_ENABLED = config.getboolean('WORKER_HEALTH_ENABLED', fallback=True)
 WORKER_HEALTH_PORT = config.getint('WORKER_HEALTH_PORT', fallback=8080)
 
+## Process Supervisor
+WORKER_HEARTBEAT_INTERVAL = config.getint('WORKER_HEARTBEAT_INTERVAL', fallback=5)
+WORKER_HEARTBEAT_TIMEOUT = config.getint('WORKER_HEARTBEAT_TIMEOUT', fallback=30)
+WORKER_DRAIN_TIMEOUT = config.getint('WORKER_DRAIN_TIMEOUT', fallback=300)
+SUPERVISOR_CHECK_INTERVAL = config.getint('SUPERVISOR_CHECK_INTERVAL', fallback=10)
+SUPERVISOR_KILL_GRACE = config.getint('SUPERVISOR_KILL_GRACE', fallback=10)
+
 ## Queue Consumed Callback
 WORKER_QUEUE_CALLBACK = config.get(
     'WORKER_QUEUE_CALLBACK', fallback=None

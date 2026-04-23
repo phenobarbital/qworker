@@ -1,8 +1,10 @@
 import asyncio
+import base64
 import time
 from typing import Union
 from collections.abc import Awaitable, Callable
 import importlib
+import cloudpickle
 from navconfig.logging import logging
 try:
     from flowtask.exceptions import (
@@ -201,8 +203,29 @@ class QueueManager:
             True if the task was successfully queued.
 
         Raises:
-            asyncio.queues.QueueFull: if the queue is at ceiling capacity.
+            asyncio.queues.QueueFull: if the queue is at ceiling capacity
+                OR if the worker is in the "draining" state (FEAT-005).
         """
+        # FEAT-005: Draining guard. When the supervisor has marked this
+        # worker as draining, reject new enqueue attempts so the TCP
+        # client retries and is re-routed by SO_REUSEPORT to a healthy
+        # sibling worker. The check runs before any queue-size logic.
+        if self._state is not None:
+            try:
+                if self._state.get_status() == "draining":
+                    self.logger.warning(
+                        "Worker %s is draining — rejecting task %s",
+                        self.worker_name,
+                        id,
+                    )
+                    raise asyncio.queues.QueueFull(
+                        f"Worker {self.worker_name} is draining"
+                    )
+            except asyncio.queues.QueueFull:
+                raise
+            except Exception:  # defensive: never let a state read error block
+                self.logger.debug("draining status read failed", exc_info=True)
+
         size = self.queue.qsize()
 
         # Warn transition (hysteresis): only log on under→over transition
@@ -238,9 +261,23 @@ class QueueManager:
                 )
                 raise
 
+        # FEAT-005: Write the task to the supervisor ledger so the
+        # supervisor can rescue it if this worker dies while the task is
+        # still in the asyncio.Queue. Use the same cloudpickle+base64
+        # format that the Redis stream path uses (qw/server.py).
+        # Ledger failure must NOT prevent the task from being executed.
+        if self._state is not None:
+            try:
+                serialized = base64.b64encode(cloudpickle.dumps(task)).decode()
+                self._state.ledger_add(str(task.id), serialized)
+            except Exception as ledger_err:
+                self.logger.error(
+                    "Ledger write failed for %s: %s", task.id, ledger_err
+                )
+
         # State tracking (unchanged behaviour)
         if self._state:
-            fn_name = self._state._get_function_name(task)
+            fn_name = self._state.get_function_name(task)
             self._state.task_queued(str(task.id), fn_name)
 
         # Cooldown reset on sustained pressure
@@ -355,6 +392,18 @@ class QueueManager:
             self.logger.info(
                 f"Task started {task} on {self.worker_name}"
             )
+            # FEAT-005: remove the task from the supervisor ledger at
+            # dequeue time (not completion time). This narrows the rescue
+            # window: tasks still in the ledger are guaranteed to be in
+            # the asyncio.Queue, so re-submission cannot cause duplicate
+            # execution for tasks already dequeued.
+            if self._state is not None:
+                try:
+                    self._state.ledger_remove(str(task.id))
+                except Exception as ledger_err:
+                    self.logger.error(
+                        "Ledger remove failed for %s: %s", task.id, ledger_err
+                    )
             if self._state:
                 self._state.task_executing(str(task.id), source="queue")
             ### Process Task:
