@@ -462,7 +462,7 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
@@ -470,7 +470,8 @@
       "parallelism_notes": "Foundation config \u2014 all other FEAT-005 tasks import these constants. Must land first.",
       "assigned_to": null,
       "started_at": "2026-04-22T23:42:05.054230+00:00",
-      "file": "sdd/tasks/active/TASK-024-supervisor-config.md"
+      "file": "sdd/tasks/completed/TASK-024-supervisor-config.md",
+      "completed_at": "2026-04-23T00:22:02.119837+00:00"
     },
     {
       "id": "TASK-025",

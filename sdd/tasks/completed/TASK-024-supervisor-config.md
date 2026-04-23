@@ -118,10 +118,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Added 5 supervisor constants to `qw/conf.py` under a new `## Process Supervisor` section, placed immediately after the existing `## HTTP Health Check Server` block. All constants use `config.getint()` with documented defaults. Verified importable via `from qw.conf import WORKER_HEARTBEAT_INTERVAL, WORKER_HEARTBEAT_TIMEOUT, WORKER_DRAIN_TIMEOUT, SUPERVISOR_CHECK_INTERVAL, SUPERVISOR_KILL_GRACE`.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none
