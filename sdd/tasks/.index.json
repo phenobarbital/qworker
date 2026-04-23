@@ -541,7 +541,7 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -552,7 +552,8 @@
       "parallelism_notes": "Core supervisor logic \u2014 creates qw/supervisor.py. Depends on config and StateTracker. Largest task in FEAT-005.",
       "assigned_to": null,
       "started_at": "2026-04-22T23:42:05.054230+00:00",
-      "file": "sdd/tasks/active/TASK-028-process-supervisor.md"
+      "file": "sdd/tasks/completed/TASK-028-process-supervisor.md",
+      "completed_at": "2026-04-23T01:40:21.240373+00:00"
     },
     {
       "id": "TASK-029",
