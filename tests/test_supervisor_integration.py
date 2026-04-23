@@ -382,7 +382,11 @@ class TestSupervisorStatusEndpoint:
         w1 = payload["workers"]["Worker-8888_1"]
         assert w1["status"] == "draining"
         assert w1["pid"] == 1002
-        assert w1["draining_since"] is not None
+        # Spec format: ISO 8601 UTC "Z" string.
+        assert isinstance(w1["draining_since"], str)
+        assert w1["draining_since"].endswith("Z")
+        # Raw epoch companion retained for arithmetic.
+        assert isinstance(w1["draining_since_ts"], (int, float))
         assert w1["heartbeat_age_s"] is not None
         # All required fields from the spec are present
         for key in (
@@ -390,6 +394,7 @@ class TestSupervisorStatusEndpoint:
             "status",
             "heartbeat_age_s",
             "draining_since",
+            "draining_since_ts",
             "task_ledger_depth",
             "queue_size",
         ):

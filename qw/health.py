@@ -17,6 +17,7 @@ Endpoints:
 """
 import asyncio
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from navconfig.logging import logging
@@ -28,6 +29,23 @@ from datamodel.parsers.json import json_encoder
 HTTP_200 = "200 OK"
 HTTP_404 = "404 Not Found"
 HTTP_503 = "503 Service Unavailable"
+
+
+def _format_iso_utc(ts: float | None) -> str | None:
+    """Format an epoch-seconds timestamp as ISO 8601 UTC ("Z").
+
+    Returns ``None`` when ``ts`` is falsy (``None`` or 0). Used by the
+    ``/supervisor/status`` endpoint so the response matches the spec
+    example (``"2026-04-23T14:30:00Z"``).
+    """
+    if not ts:
+        return None
+    try:
+        return datetime.fromtimestamp(
+            float(ts), tz=timezone.utc
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError, OSError):
+        return None
 
 
 def _http_response(status: str, body: str) -> bytes:
@@ -219,12 +237,18 @@ class HealthServer:
                   "pid": int,
                   "status": "healthy" | "draining",
                   "heartbeat_age_s": float | None,
-                  "draining_since": float | None,
+                  "draining_since": str | None,      # ISO 8601 UTC ("Z"),
+                  "draining_since_ts": float | None, # raw epoch seconds
                   "task_ledger_depth": int,
                   "queue_size": int
                 }, ...
               }
             }
+
+        ``draining_since`` is formatted per the spec example
+        (``"2026-04-23T14:30:00Z"``). ``draining_since_ts`` preserves the
+        raw epoch-seconds float so downstream tooling can do arithmetic
+        without re-parsing the ISO string.
 
         Returns 503 when the HealthServer has no shared state reference —
         typical of older deployments or the ``shared_state=None`` path.
@@ -249,11 +273,14 @@ class HealthServer:
                 heartbeat_age = (
                     round(now - heartbeat, 1) if heartbeat > 0 else None
                 )
+                draining_since_ts = state.get("draining_since")
+                draining_since_iso = _format_iso_utc(draining_since_ts)
                 workers[name] = {
                     "pid": state.get("pid"),
                     "status": state.get("status", "unknown"),
                     "heartbeat_age_s": heartbeat_age,
-                    "draining_since": state.get("draining_since"),
+                    "draining_since": draining_since_iso,
+                    "draining_since_ts": draining_since_ts,
                     "task_ledger_depth": len(state.get("task_ledger", [])),
                     "queue_size": len(state.get("queue", [])),
                 }

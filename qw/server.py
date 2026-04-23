@@ -763,6 +763,16 @@ class QWorker:
                 result = f'Task {task!s} with id {uid} was queued.'.encode('utf-8')
                 return await self.return_result(writer, result, task, uid)
             except asyncio.QueueFull as ex:
+                # FEAT-005 TOCTOU note: this branch catches two
+                # distinct conditions that share the same exception
+                # type. (1) the queue is genuinely at ceiling capacity,
+                # or (2) the worker status flipped to "draining"
+                # between the `_is_draining()` check above and the
+                # `queue.put()` call — in which case the draining guard
+                # inside QueueManager.put raises QueueFull with
+                # "...is draining" in the message. Both cases correctly
+                # reject the task; only the diagnostic wording is
+                # slightly misleading for the draining race.
                 return await self.queue_full(
                     message=f"Queue in {self.name!s} is Full, discarding Task {task!r}",
                     writer=writer
@@ -864,6 +874,12 @@ class QWorker:
                         result = f'Task {task!s} was Queued.'.encode('utf-8')
                         return await self.return_result(writer, result, task, task_uuid)
                     except asyncio.QueueFull as exc:
+                        # See FEAT-005 TOCTOU note above in
+                        # handle_queue_wrapper — a race can also flip
+                        # status to "draining" between the
+                        # `_is_draining()` check and this put(), which
+                        # surfaces here as QueueFull with
+                        # "...is draining" in the message.
                         return await self.queue_full(
                             message=f'Queue Full, Task {task!s} was discarded',
                             writer=writer

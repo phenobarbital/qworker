@@ -69,6 +69,7 @@ def _make_supervisor(
     heartbeat_timeout: float = 30.0,
     drain_timeout: float = 300.0,
     check_interval: float = 10.0,
+    kill_grace: float = 10.0,
 ) -> ProcessSupervisor:
     return ProcessSupervisor(
         shared_state=shared,
@@ -82,6 +83,7 @@ def _make_supervisor(
         check_interval=check_interval,
         heartbeat_timeout=heartbeat_timeout,
         drain_timeout=drain_timeout,
+        kill_grace=kill_grace,
     )
 
 
@@ -367,14 +369,30 @@ class TestKillAndRespawn:
         # Stays alive across all terminate() + is_alive() polls
         proc.is_alive.return_value = True
 
-        sup = _make_supervisor(shared, job_list=[proc])
-        with patch("qw.supervisor.SUPERVISOR_KILL_GRACE", 0.05), \
-                patch.object(sup, "_rescue_tasks", return_value=0), \
+        # Short kill_grace via the constructor param (no module patching).
+        sup = _make_supervisor(shared, job_list=[proc], kill_grace=0.05)
+        with patch.object(sup, "_rescue_tasks", return_value=0), \
                 patch.object(sup, "_respawn_worker", return_value=MagicMock()):
             sup._kill_and_respawn(0, proc, "Worker-8888_0")
 
         proc.terminate.assert_called_once()
         proc.kill.assert_called_once()
+
+    def test_kill_grace_defaults_to_config_constant(self, shared):
+        """If `kill_grace` is not passed, the configured default wins."""
+        from qw.conf import SUPERVISOR_KILL_GRACE
+
+        sup = ProcessSupervisor(
+            shared_state=shared,
+            job_list=[],
+            worker_name_prefix="W",
+            host="127.0.0.1",
+            port=8888,
+            debug=False,
+            notify_empty=False,
+            health_port=8080,
+        )
+        assert sup._kill_grace == float(SUPERVISOR_KILL_GRACE)
 
 
 # ----------------------------------------------------------------------

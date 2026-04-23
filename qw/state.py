@@ -47,11 +47,13 @@ class StateTracker:
     # Helper: function name extraction
     # ------------------------------------------------------------------
 
-    def _get_function_name(self, task) -> str:
+    def get_function_name(self, task) -> str:
         """Extract a human-readable function name from a task wrapper.
 
-        Checks isinstance in order: FuncWrapper first (has .func attribute),
-        then falls back to repr(), then '<unknown>'.
+        Public helper used by :class:`qw.queues.manager.QueueManager`
+        when logging queued tasks. Checks isinstance in order: FuncWrapper
+        first (has .func attribute), then falls back to repr(), then
+        '<unknown>'.
         """
         # Lazy imports to avoid circular dependencies; these are only used
         # for isinstance checks and the import is cheap after first load.
@@ -81,6 +83,11 @@ class StateTracker:
             pass
 
         return "<unknown>"
+
+    # Backwards-compatibility alias for the previously-private name.
+    # External callers (e.g. older integrations) may still reference
+    # ``_get_function_name``. Prefer :meth:`get_function_name` in new code.
+    _get_function_name = get_function_name
 
     # ------------------------------------------------------------------
     # Source-list mapping

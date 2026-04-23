@@ -84,6 +84,7 @@ class ProcessSupervisor(threading.Thread):
         check_interval: float = SUPERVISOR_CHECK_INTERVAL,
         heartbeat_timeout: float = WORKER_HEARTBEAT_TIMEOUT,
         drain_timeout: float = WORKER_DRAIN_TIMEOUT,
+        kill_grace: float = SUPERVISOR_KILL_GRACE,
     ) -> None:
         super().__init__(daemon=True, name="QW.Supervisor")
         self._shared_state = shared_state
@@ -97,6 +98,11 @@ class ProcessSupervisor(threading.Thread):
         self._check_interval = float(check_interval)
         self._heartbeat_timeout = float(heartbeat_timeout)
         self._drain_timeout = float(drain_timeout)
+        # Stored as an instance attribute (consistent with the other
+        # timeouts) so tests can override without patching module-level
+        # constants, and so different supervisor instances can use
+        # different kill-grace values if needed.
+        self._kill_grace = float(kill_grace)
         self._stop_event = threading.Event()
         self.logger = logging.getLogger("QW.Supervisor")
 
@@ -350,9 +356,23 @@ class ProcessSupervisor(threading.Thread):
     def _respawn_worker(self, idx: int, worker_name: str):
         """Spawn a replacement ``mp.Process`` using the same slot id.
 
-        Replicates the spawn pattern in ``qw/process.py`` exactly so the
-        new process joins the same ``SO_REUSEPORT`` pool and writes into
-        the same ``shared_state`` slot as the dead worker.
+        Replicates the exact spawn pattern used by
+        ``SpawnProcess.__init__`` in ``qw/process.py`` (lines 94–107 at
+        the time of FEAT-005): same ``target=start_server``, same
+        positional-arg tuple, same ``name=f"{prefix}_{idx}"``. Staying
+        bit-for-bit aligned with that call site matters because the new
+        process must:
+
+        * join the same ``SO_REUSEPORT`` pool (same host/port),
+        * register into the same slot in the shared Manager dict under
+          the same ``worker_name`` (so ``StateTracker`` overwrites the
+          dead entry cleanly),
+        * be addressable by the supervisor in subsequent cycles under
+          the same ``f"{prefix}_{idx}"`` name.
+
+        If either the spawn pattern or ``start_server``'s signature ever
+        changes in ``qw/process.py`` / ``qw/server.py``, this method
+        MUST be updated in lockstep.
 
         Returns:
             The newly started ``mp.Process`` (already ``.start()``-ed),
@@ -423,7 +443,7 @@ class ProcessSupervisor(threading.Thread):
                         term_err,
                     )
                 # Grace period for SIGTERM to take effect.
-                grace_end = time.monotonic() + SUPERVISOR_KILL_GRACE
+                grace_end = time.monotonic() + self._kill_grace
                 while time.monotonic() < grace_end:
                     if not process.is_alive():
                         break

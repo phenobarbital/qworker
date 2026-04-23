@@ -277,7 +277,7 @@ class QueueManager:
 
         # State tracking (unchanged behaviour)
         if self._state:
-            fn_name = self._state._get_function_name(task)
+            fn_name = self._state.get_function_name(task)
             self._state.task_queued(str(task.id), fn_name)
 
         # Cooldown reset on sustained pressure

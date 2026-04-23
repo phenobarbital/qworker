@@ -222,43 +222,101 @@ class TestGetState:
         assert state["pid"] == 12345
 
     def test_get_state_contains_all_keys(self, tracker):
-        """get_state contains all expected keys."""
+        """get_state contains all expected keys (legacy + FEAT-005)."""
         state = tracker.get_state()
-        for key in ("pid", "queue", "tcp_executing", "redis_executing",
-                    "broker_executing", "completed"):
-            assert key in state
+        expected = (
+            # Legacy lifecycle fields
+            "pid", "queue", "tcp_executing", "redis_executing",
+            "broker_executing", "completed",
+            # FEAT-005 — process supervisor / heartbeat / task ledger
+            "heartbeat", "status", "draining_since", "task_ledger",
+        )
+        for key in expected:
+            assert key in state, f"missing key {key!r} in get_state()"
+
+
+class TestGetAllStates:
+    """Regression coverage for the `qw info` TCP command path.
+
+    `QWorker.worker_info()` forwards `StateTracker.get_all_states()` as
+    the JSON payload for the `info` command, so any new field added to
+    the state dict automatically appears in `qw info` output. These
+    tests pin that contract.
+    """
+
+    def test_get_all_states_returns_mapping_of_workers(self, shared_state):
+        # Two workers sharing the same Manager dict
+        t0 = StateTracker(shared_state, worker_name="W0", pid=1001)
+        t1 = StateTracker(shared_state, worker_name="W1", pid=1002)
+        assert set(t0.get_all_states().keys()) == {"W0", "W1"}
+
+    def test_get_all_states_exposes_feat005_fields(self, tracker):
+        """`qw info` must expose the new supervisor fields for each worker."""
+        all_states = tracker.get_all_states()
+        assert "TestWorker_0" in all_states
+        state = all_states["TestWorker_0"]
+        for key in (
+            "heartbeat", "status", "draining_since", "task_ledger",
+        ):
+            assert key in state, (
+                f"FEAT-005 field {key!r} missing from get_all_states() — "
+                "qw info command would not expose it"
+            )
+
+    def test_get_all_states_reflects_supervisor_writes(self, tracker):
+        """Supervisor updates to status/draining_since show up in `qw info`."""
+        tracker.set_status("draining", draining_since=1234567890.0)
+        tracker.update_heartbeat()
+        tracker.ledger_add("task-abc", "payload-b64")
+
+        all_states = tracker.get_all_states()
+        state = all_states["TestWorker_0"]
+        assert state["status"] == "draining"
+        assert state["draining_since"] == 1234567890.0
+        assert state["heartbeat"] > 0
+        assert len(state["task_ledger"]) == 1
+        assert state["task_ledger"][0]["task_id"] == "task-abc"
 
 
 class TestGetFunctionName:
     def test_func_wrapper_name(self, tracker):
-        """_get_function_name extracts name from FuncWrapper."""
+        """get_function_name extracts name from FuncWrapper."""
         from qw.wrappers.func import FuncWrapper
 
         async def my_function():
             pass
 
         wrapper = FuncWrapper(host="localhost", func=my_function, queued=True)
-        name = tracker._get_function_name(wrapper)
+        name = tracker.get_function_name(wrapper)
         assert name == "my_function"
 
     def test_task_wrapper_repr(self, tracker):
-        """_get_function_name falls back to repr for TaskWrapper."""
+        """get_function_name falls back to repr for TaskWrapper."""
         try:
             from qw.wrappers.di_task import TaskWrapper
         except Exception:
             pytest.skip("TaskWrapper not available in this environment (flowtask not configured)")
         wrapper = TaskWrapper(program="my_prog", task="my_task")
-        name = tracker._get_function_name(wrapper)
+        name = tracker.get_function_name(wrapper)
         assert "my_task" in name or "my_prog" in name
 
     def test_unknown_fallback(self, tracker):
-        """_get_function_name returns a string for unrecognized objects."""
+        """get_function_name returns a string for unrecognized objects."""
         # We can't test TaskWrapper fallback when flowtask isn't installed,
         # so test with a plain QueueWrapper instead.
         from qw.wrappers.base import QueueWrapper
         wrapper = QueueWrapper(queued=True)
-        name = tracker._get_function_name(wrapper)
+        name = tracker.get_function_name(wrapper)
         assert isinstance(name, str)
+
+    def test_legacy_private_alias_still_works(self, tracker):
+        """The old ``_get_function_name`` name keeps working for callers
+        that still use it."""
+        from qw.wrappers.base import QueueWrapper
+        wrapper = QueueWrapper(queued=True)
+        # Both names must resolve to the same callable.
+        assert tracker._get_function_name == tracker.get_function_name
+        assert isinstance(tracker._get_function_name(wrapper), str)
 
 
 # ======================================================================

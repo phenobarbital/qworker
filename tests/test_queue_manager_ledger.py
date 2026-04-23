@@ -12,6 +12,7 @@ import asyncio
 import base64
 import multiprocessing as mp
 import uuid
+from unittest.mock import AsyncMock, patch
 
 import cloudpickle
 import pytest
@@ -127,24 +128,52 @@ class TestLedgerIntegration:
     async def test_queue_handler_removes_entry_on_dequeue(
         self, state_tracker, shared
     ):
-        """queue_handler removes the ledger entry immediately after get()."""
+        """The REAL queue_handler() removes the ledger entry after get().
+
+        This test exercises the production code path in
+        ``QueueManager.queue_handler`` — not a reimplementation — so a
+        regression that removed the ``ledger_remove`` call from the
+        handler would fail this assertion.
+
+        We patch ``TaskExecutor`` so ``run()`` returns immediately and
+        does not attempt real execution (no executor side-effects, no
+        I/O). One iteration of the handler is driven by cancelling it
+        shortly after it consumes the single queued task.
+        """
         qm = QueueManager(worker_name="W0", state_tracker=state_tracker)
         task = _make_task()
         await qm.put(task, id=str(task.id))
-        # Confirm the entry was added
         assert len(dict(shared["W0"])["task_ledger"]) == 1
 
-        # Run one iteration of queue_handler manually to exercise the
-        # dequeue + ledger_remove path without needing a real executor.
-        async def run_one_iteration():
-            got = await qm.queue.get()
-            state_tracker.ledger_remove(str(got.id))
-            qm.queue.task_done()
+        mock_executor = AsyncMock()
+        mock_executor.run = AsyncMock(return_value="ok")
 
-        await asyncio.wait_for(run_one_iteration(), timeout=1.0)
+        with patch(
+            "qw.queues.manager.TaskExecutor", return_value=mock_executor
+        ):
+            handler = asyncio.create_task(qm.queue_handler())
+            # Wait until the ledger is cleared (or give up after a
+            # generous timeout). Polling keeps the test fast and robust.
+            deadline = asyncio.get_event_loop().time() + 2.0
+            while asyncio.get_event_loop().time() < deadline:
+                if not dict(shared["W0"])["task_ledger"]:
+                    break
+                await asyncio.sleep(0.02)
+            handler.cancel()
+            try:
+                await handler
+            except asyncio.CancelledError:
+                pass
 
         d = dict(shared["W0"])
-        assert d["task_ledger"] == []
+        assert d["task_ledger"] == [], (
+            "queue_handler did not remove the ledger entry after "
+            "dequeue — the ledger_remove call in manager.queue_handler "
+            "is either missing or broken"
+        )
+        # Confirm the mocked executor was actually called — i.e. we
+        # really exercised the handler's body, not just its outer await.
+        mock_executor.run.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_ledger_failure_does_not_block_put(self, state_tracker):

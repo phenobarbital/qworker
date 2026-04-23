@@ -199,7 +199,13 @@ class TestSupervisorStatus:
 
         w1 = payload["workers"]["W1"]
         assert w1["status"] == "draining"
-        assert w1["draining_since"] is not None
+        # draining_since is ISO 8601 UTC (spec section 3, Module 7)
+        assert isinstance(w1["draining_since"], str)
+        assert w1["draining_since"].endswith("Z")
+        assert "T" in w1["draining_since"]
+        # Raw epoch-seconds companion is preserved so downstream tools
+        # can do arithmetic without re-parsing the ISO string.
+        assert isinstance(w1["draining_since_ts"], (int, float))
         assert w1["heartbeat_age_s"] is not None
         assert w1["heartbeat_age_s"] >= 44.9  # ~45s
 
