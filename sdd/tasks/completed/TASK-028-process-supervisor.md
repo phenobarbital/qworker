@@ -423,10 +423,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Created `qw/supervisor.py` with `ProcessSupervisor(threading.Thread, daemon=True)` implementing the full HEALTHY → DRAINING → DEAD → HEALTHY state machine. The supervisor operates directly on the `shared_state` dict (not via `StateTracker`) because it monitors all workers. Key methods: `run()` — main loop using `threading.Event.wait` so `stop()` preempts the sleep; `_check_worker()` — applies the state machine (dead → kill/respawn; stale heartbeat → draining; recovery → healthy; drain timeout → kill/respawn); `_mark_draining` / `_mark_healthy` — full-value Manager-proxy writes; `_rescue_tasks()` — uses SYNC `redis` client (method-level import, deferred per spec) to `xadd` entries to `REDIS_WORKER_STREAM` in the same `{"task":..., "uid":...}` shape as `start_subscription` expects. Ledger is cleared atomically up front so a failing xadd loop cannot cause duplicate rescues; `_kill_and_respawn()` — rescue → terminate → grace poll (0.2s increments up to `SUPERVISOR_KILL_GRACE`) → kill → join(timeout=5) → respawn via `mp.Process(target=start_server, ...)` replicating the spawn pattern from `qw/process.py`; `_respawn_worker()` — same spawn pattern as `SpawnProcess.__init__`; `_worker_name_for()` — skips processes whose name doesn't start with the worker prefix (NotifyWorker). Created `tests/test_supervisor.py` with 21 tests across 7 test classes covering: construction (daemon, stop), state machine (dead/stale/fresh/zero heartbeat), draining transitions (recovery, drain timeout, within budget), status helpers, task rescue (push/empty/redis-fails), kill-and-respawn (slot replacement, rescue-before-respawn, SIGKILL escalation), name filtering, and the full run loop. Full suite: 128 passed, 1 skipped.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none — all pattern snippets, constraints, and referenced integration points honored.

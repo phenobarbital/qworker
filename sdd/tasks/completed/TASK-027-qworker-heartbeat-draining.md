@@ -260,10 +260,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Added `WORKER_HEARTBEAT_INTERVAL` to the `qw/server.py` import block. Added `self._heartbeat_task: Optional[asyncio.Task] = None` attribute and a dedicated `self._heartbeat_logger = logging.getLogger('QW.Heartbeat')` per the spec logging guidance. Implemented `_heartbeat_loop()` as an async method that ticks every `WORKER_HEARTBEAT_INTERVAL` seconds writing via `self._state.update_heartbeat()` — defensive against proxy errors and cleanly exits on `asyncio.CancelledError`. Implemented `_is_draining()` as a sync method that reads `self._state.get_status()`, returning False when `_state` is None or on read error. Hooked the heartbeat task creation into `start()` (right after `fire_consumers()`, before `serve_forever`) and a cancel-and-await into `shutdown()` (before the health-server stop). Added draining guards in `handle_queue_wrapper()` (on the `task.queued is True` branch, before `queue.put`) and in `connection_handler()` (on the generic queue path, before `queue.put`). Both guards serialize a `QWException("Worker ... is draining, retry on another worker")` via cloudpickle and call `closing_writer` so the TCP client receives a proper error and retries. Created `tests/test_heartbeat.py` with 9 tests covering `_is_draining` (5) and `_heartbeat_loop` (3) plus one config sanity check. Full suite: 107 passed, 1 skipped.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none — follows all pattern snippets and constraints. Extra: added `QW.Heartbeat` dedicated logger per spec section 7.

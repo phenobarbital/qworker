@@ -462,15 +462,16 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
       "parallel": false,
-      "parallelism_notes": "Foundation config — all other FEAT-005 tasks import these constants. Must land first.",
+      "parallelism_notes": "Foundation config \u2014 all other FEAT-005 tasks import these constants. Must land first.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-024-supervisor-config.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-024-supervisor-config.md",
+      "completed_at": "2026-04-23T00:22:02.119837+00:00"
     },
     {
       "id": "TASK-025",
@@ -479,15 +480,18 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "M",
-      "depends_on": ["TASK-024"],
+      "depends_on": [
+        "TASK-024"
+      ],
       "parallel": false,
-      "parallelism_notes": "Extends qw/state.py — data layer for heartbeat, status, ledger. Required by TASK-026, TASK-027, TASK-028.",
+      "parallelism_notes": "Extends qw/state.py \u2014 data layer for heartbeat, status, ledger. Required by TASK-026, TASK-027, TASK-028.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-025-state-tracker-extensions.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-025-state-tracker-extensions.md",
+      "completed_at": "2026-04-23T00:30:14.145292+00:00"
     },
     {
       "id": "TASK-026",
@@ -496,15 +500,18 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "M",
-      "depends_on": ["TASK-025"],
+      "depends_on": [
+        "TASK-025"
+      ],
       "parallel": false,
-      "parallelism_notes": "Modifies qw/queues/manager.py — depends on StateTracker ledger methods from TASK-025.",
+      "parallelism_notes": "Modifies qw/queues/manager.py \u2014 depends on StateTracker ledger methods from TASK-025.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-026-queue-manager-ledger.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-026-queue-manager-ledger.md",
+      "completed_at": "2026-04-23T00:34:15.906922+00:00"
     },
     {
       "id": "TASK-027",
@@ -513,15 +520,19 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "M",
-      "depends_on": ["TASK-024", "TASK-025"],
+      "depends_on": [
+        "TASK-024",
+        "TASK-025"
+      ],
       "parallel": false,
-      "parallelism_notes": "Modifies qw/server.py — depends on config from TASK-024 and StateTracker heartbeat methods from TASK-025.",
+      "parallelism_notes": "Modifies qw/server.py \u2014 depends on config from TASK-024 and StateTracker heartbeat methods from TASK-025.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-027-qworker-heartbeat-draining.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-027-qworker-heartbeat-draining.md",
+      "completed_at": "2026-04-23T00:46:14.850392+00:00"
     },
     {
       "id": "TASK-028",
@@ -530,15 +541,19 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "L",
-      "depends_on": ["TASK-024", "TASK-025"],
+      "depends_on": [
+        "TASK-024",
+        "TASK-025"
+      ],
       "parallel": false,
-      "parallelism_notes": "Core supervisor logic — creates qw/supervisor.py. Depends on config and StateTracker. Largest task in FEAT-005.",
+      "parallelism_notes": "Core supervisor logic \u2014 creates qw/supervisor.py. Depends on config and StateTracker. Largest task in FEAT-005.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-028-process-supervisor.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-028-process-supervisor.md",
+      "completed_at": "2026-04-23T01:40:21.240373+00:00"
     },
     {
       "id": "TASK-029",
@@ -547,15 +562,18 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "S",
-      "depends_on": ["TASK-028"],
+      "depends_on": [
+        "TASK-028"
+      ],
       "parallel": false,
-      "parallelism_notes": "Wires supervisor into SpawnProcess — must follow TASK-028 (ProcessSupervisor class).",
+      "parallelism_notes": "Wires supervisor into SpawnProcess \u2014 must follow TASK-028 (ProcessSupervisor class).",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-029-spawnprocess-integration.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-029-spawnprocess-integration.md",
+      "completed_at": "2026-04-23T01:49:01.783217+00:00"
     },
     {
       "id": "TASK-030",
@@ -564,15 +582,19 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "medium",
       "effort": "M",
-      "depends_on": ["TASK-025", "TASK-027"],
+      "depends_on": [
+        "TASK-025",
+        "TASK-027"
+      ],
       "parallel": false,
-      "parallelism_notes": "Modifies qw/health.py and qw/server.py — depends on StateTracker status fields and QWorker draining flag.",
+      "parallelism_notes": "Modifies qw/health.py and qw/server.py \u2014 depends on StateTracker status fields and QWorker draining flag.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-030-health-draining-supervisor-endpoint.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-030-health-draining-supervisor-endpoint.md",
+      "completed_at": "2026-04-23T01:53:04.602693+00:00"
     },
     {
       "id": "TASK-031",
@@ -581,15 +603,24 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "pending",
+      "status": "done",
       "priority": "high",
       "effort": "L",
-      "depends_on": ["TASK-024", "TASK-025", "TASK-026", "TASK-027", "TASK-028", "TASK-029", "TASK-030"],
+      "depends_on": [
+        "TASK-024",
+        "TASK-025",
+        "TASK-026",
+        "TASK-027",
+        "TASK-028",
+        "TASK-029",
+        "TASK-030"
+      ],
       "parallel": false,
-      "parallelism_notes": "Final validation task — requires all FEAT-005 modules to be complete before running end-to-end tests.",
+      "parallelism_notes": "Final validation task \u2014 requires all FEAT-005 modules to be complete before running end-to-end tests.",
       "assigned_to": null,
-      "started_at": null,
-      "file": "sdd/tasks/active/TASK-031-integration-tests.md"
+      "started_at": "2026-04-22T23:42:05.054230+00:00",
+      "file": "sdd/tasks/completed/TASK-031-integration-tests.md",
+      "completed_at": "2026-04-23T01:59:18.726597+00:00"
     }
   ]
 }

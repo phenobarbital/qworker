@@ -165,10 +165,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Added `from .supervisor import ProcessSupervisor` to the top-level imports in `qw/process.py` (no circular-import risk since the supervisor only imports from `qw.server` and `qw.conf`). In `SpawnProcess.__init__`, after the NotifyWorker spawn branch, the supervisor is instantiated with all 8 required args (`shared_state`, `JOB_LIST`, `worker` prefix, `host`, `port`, `debug`, `args.notify_empty`, `_health_port`) and `start()`-ed. Supervisor-init failures are logged and do not block worker startup (`self._supervisor` is kept as `None` so the cleanup path is a no-op). In `SpawnProcess.terminate`, the supervisor is stopped (`stop()` + `join(timeout=5)`) BEFORE the `JOB_LIST` termination loop so it does not try to respawn workers during intentional shutdown. Full test suite: 128 passed, 1 skipped.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none. Added defensive try/except around supervisor init so a supervisor failure never prevents workers from starting.

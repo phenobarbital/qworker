@@ -336,10 +336,24 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: Created `tests/test_supervisor_integration.py` with 13 integration tests spanning 7 test classes, each mapping to the acceptance criteria:
 
-**Completed by**:
-**Date**:
-**Notes**:
+1. `TestWorkerCrashRecoveryE2E.test_dead_worker_triggers_rescue_and_respawn` — dead `is_alive()==False` triggers `_rescue_tasks` (2 ledger entries → 2 `xadd` calls on a mocked `redis.Redis`), `_kill_and_respawn` runs (join called on dead proc, patched `mp.Process` used for respawn), slot in job_list is replaced, ledger cleared.
+2. `TestStuckWorkerDrainCycle.test_stale_heartbeat_marks_draining` — 60s stale heartbeat with `heartbeat_timeout=30` → status flips to "draining" with non-null `draining_since`.
+3. `TestStuckWorkerDrainCycle.test_drain_timeout_kills_and_respawns` — `draining_since=400s` ago with `drain_timeout=300` → `_kill_and_respawn` called.
+4. `TestDrainingClientRetry.test_draining_worker_rejects_new_tasks` — `QueueManager.put()` raises `asyncio.QueueFull("...draining")` when `StateTracker.set_status("draining")` has been called.
+5. `TestDrainingClientRetry.test_healthy_sibling_still_accepts_tasks` — 2 StateTrackers share the same Manager dict; the healthy sibling's QueueManager still accepts tasks.
+6. `TestSelfRecovery.test_heartbeat_resumes_restores_healthy` — fresh heartbeat on a draining worker → status flips back to "healthy", `draining_since` cleared.
+7. `TestSelfRecovery.test_recovered_worker_accepts_tasks_again` — async test: draining → QueueFull, flip to healthy → subsequent `put()` returns True.
+8. `TestHealthReadyDraining.test_readiness_503_when_draining` — `/health/ready` returns HTTP 503 with `"status": "draining"` body.
+9. `TestHealthReadyDraining.test_readiness_200_when_healthy` — healthy worker with empty queue → 200.
+10. `TestSupervisorStatusEndpoint.test_returns_all_workers_with_expected_fields` — 2 workers, one draining with a ledger entry. All 6 required fields present (`pid`, `status`, `heartbeat_age_s`, `draining_since`, `task_ledger_depth`, `queue_size`).
+11. `TestSupervisorStatusEndpoint.test_returns_503_without_shared_state` — no shared state → 503.
+12. `TestSupervisorObservesWorkerWrites.test_supervisor_reads_heartbeat_written_by_statetracker` — StateTracker writes, supervisor reads; values match.
+13. `TestSupervisorObservesWorkerWrites.test_supervisor_mark_draining_visible_to_statetracker` — supervisor writes, StateTracker reads; both halves of the contract verified.
 
-**Deviations from spec**: none | describe if any
+All tests use `multiprocessing.Manager().dict()` (real proxy, not plain dict). Redis is mocked via `sys.modules["redis"]` swap; `mp.Process` is patched via `qw.supervisor.mp.Process` so no real subprocess is spawned. Tests run quickly (~6s for the whole file). **Full suite: 152 passed, 1 skipped, 0 failures.**
+
+**Deviations from spec**: none. Added 2 bonus bridge tests (`TestSupervisorObservesWorkerWrites`) to verify the StateTracker ↔ Supervisor shared-state roundtrip since this is the integration boundary of the feature.

@@ -3,7 +3,7 @@
 **Feature ID**: FEAT-005
 **Date**: 2026-04-23
 **Author**: Jesus Lara
-**Status**: draft
+**Status**: approved
 **Target version**: 2.1.0
 
 ---
