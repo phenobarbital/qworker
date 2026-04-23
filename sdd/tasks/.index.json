@@ -582,7 +582,7 @@
       "feature_id": "FEAT-005",
       "feature": "process-supervisor",
       "spec": "sdd/specs/process-supervisor.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "medium",
       "effort": "M",
       "depends_on": [
@@ -593,7 +593,8 @@
       "parallelism_notes": "Modifies qw/health.py and qw/server.py \u2014 depends on StateTracker status fields and QWorker draining flag.",
       "assigned_to": null,
       "started_at": "2026-04-22T23:42:05.054230+00:00",
-      "file": "sdd/tasks/active/TASK-030-health-draining-supervisor-endpoint.md"
+      "file": "sdd/tasks/completed/TASK-030-health-draining-supervisor-endpoint.md",
+      "completed_at": "2026-04-23T01:53:04.602693+00:00"
     },
     {
       "id": "TASK-031",

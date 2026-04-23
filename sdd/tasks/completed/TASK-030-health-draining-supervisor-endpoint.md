@@ -312,10 +312,8 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-04-23
+**Notes**: `qw/health.py` — added `import time` and `shared_state=None` parameter to `HealthServer.__init__`. `_readiness()` now performs the draining check FIRST: reads `dict(self._shared_state.get(self._worker_name, {}))` and returns 503 with `{"status": "draining", "worker": ..., "draining_since": ...}` before the existing queue-ceiling logic. When `shared_state` is None or the read fails, the old behavior is preserved (fully backwards compatible). `_route()` now dispatches `/supervisor/status` to a new `_supervisor_status()` method. `_supervisor_status()` walks all `self._shared_state.items()` and returns `{"workers": {<name>: {pid, status, heartbeat_age_s, draining_since, task_ledger_depth, queue_size}}}`. `heartbeat_age_s` is `None` when heartbeat is 0 (worker has not emitted one yet). Returns 503 with an `{"error": ..., "workers": {}}` body when `shared_state` is None. Updated the docstring top-level block to document the new endpoint. `qw/server.py` — extended the HealthServer constructor call with `shared_state=self._shared_state`. Created `tests/test_health_supervisor.py` with 11 tests across 3 test classes: readiness draining (5 — draining→503, healthy→200, no state, queue-full existing behavior, draining-beats-full), supervisor status (4 — multi-worker shape, none heartbeat, no state, route dispatch), and route fall-through (2 — 404 + liveness unaffected). Full suite: 139 passed, 1 skipped.
 
-**Completed by**:
-**Date**:
-**Notes**:
-
-**Deviations from spec**: none | describe if any
+**Deviations from spec**: none — pattern followed exactly; added `draining_since` to the readiness-503 response body for debuggability.
