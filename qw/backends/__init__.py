@@ -11,6 +11,7 @@ from .models import (
     deserialize_from_container,
 )
 from .base import BaseExecutionBackend, BackendRegistry
+from .local import LocalBackend
 
 __all__ = [
     "ContainerResources",
@@ -21,4 +22,5 @@ __all__ = [
     "deserialize_from_container",
     "BaseExecutionBackend",
     "BackendRegistry",
+    "LocalBackend",
 ]
