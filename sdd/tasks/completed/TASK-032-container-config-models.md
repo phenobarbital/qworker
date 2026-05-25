@@ -197,9 +197,7 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
-**Deviations from spec**: none | describe if any
+**Completed by**: Claude Sonnet 4.6 (sdd-worker)
+**Date**: 2026-05-25
+**Notes**: All 20 unit tests pass. deserialize_from_container accepts raw bytes for cloudpickle (no double-decode).
+**Deviations from spec**: none

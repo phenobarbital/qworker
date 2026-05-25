@@ -629,7 +629,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [],
@@ -637,7 +637,8 @@
       "parallelism_notes": "Pure data models with no file overlap. Can run in parallel with TASK-040.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-032-container-config-models.md"
+      "completed_at": "2026-05-25T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-032-container-config-models.md"
     },
     {
       "id": "TASK-033",
