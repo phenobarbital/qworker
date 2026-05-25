@@ -10,6 +10,7 @@ from .models import (
     serialize_for_container,
     deserialize_from_container,
 )
+from .base import BaseExecutionBackend, BackendRegistry
 
 __all__ = [
     "ContainerResources",
@@ -18,4 +19,6 @@ __all__ = [
     "TaskResult",
     "serialize_for_container",
     "deserialize_from_container",
+    "BaseExecutionBackend",
+    "BackendRegistry",
 ]
