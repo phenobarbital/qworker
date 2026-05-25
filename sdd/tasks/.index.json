@@ -629,14 +629,14 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [],
       "parallel": true,
       "parallelism_notes": "Pure data models with no file overlap. Can run in parallel with TASK-040.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-032-container-config-models.md"
     },
     {
@@ -646,7 +646,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -655,7 +655,7 @@
       "parallel": false,
       "parallelism_notes": "Imports from TASK-032 models. Sequential after TASK-032.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-033-execution-backend-abstraction.md"
     },
     {
@@ -665,7 +665,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -674,7 +674,7 @@
       "parallel": true,
       "parallelism_notes": "Creates qw/backends/local.py. Can run in parallel with TASK-035, TASK-036 after TASK-033.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-034-local-backend.md"
     },
     {
@@ -684,7 +684,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -693,7 +693,7 @@
       "parallel": true,
       "parallelism_notes": "Creates qw/backends/docker.py. No file overlap with TASK-034 or TASK-036. Parallel after TASK-033.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-035-docker-backend.md"
     },
     {
@@ -703,7 +703,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -712,7 +712,7 @@
       "parallel": true,
       "parallelism_notes": "Creates qw/backends/k8s.py. No file overlap with TASK-034 or TASK-035. Parallel after TASK-033.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-036-k8s-backend.md"
     },
     {
@@ -722,7 +722,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -731,7 +731,7 @@
       "parallel": true,
       "parallelism_notes": "Creates qw/backends/monitor.py. No file overlap with TASK-034/035/036. Parallel with backends after TASK-040.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-037-resource-monitor.md"
     },
     {
@@ -741,7 +741,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -750,7 +750,7 @@
       "parallel": true,
       "parallelism_notes": "Modifies qw/wrappers/base.py and qw/client.py. No file overlap with TASK-033/034/035/036. Parallel after TASK-032.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-038-queue-wrapper-extension.md"
     },
     {
@@ -760,7 +760,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "XL",
       "depends_on": [
@@ -773,7 +773,7 @@
       "parallel": false,
       "parallelism_notes": "Integration task \u2014 imports from all backends, modifies qw/queues/manager.py. Must follow all backend tasks.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-039-backend-dispatcher.md"
     },
     {
@@ -783,14 +783,14 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
       "parallel": true,
       "parallelism_notes": "Only modifies qw/conf.py and pyproject.toml. No file overlap with TASK-032. Parallel at start.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-040-config-extension.md"
     },
     {
@@ -800,7 +800,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "medium",
       "effort": "M",
       "depends_on": [
@@ -810,7 +810,7 @@
       "parallel": false,
       "parallelism_notes": "Final task \u2014 modifies qw/health.py, depends on dispatcher and monitor being complete.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-25T00:00:00Z",
       "file": "sdd/tasks/active/TASK-041-health-server-extension.md"
     }
   ]
