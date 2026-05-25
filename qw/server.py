@@ -911,6 +911,20 @@ class QWorker:
             )
 
 
+def _cancel_remaining_tasks(loop: asyncio.AbstractEventLoop) -> None:
+    """Cancel all pending tasks and drain callbacks before closing the loop.
+
+    Prevents 'Event loop is closed' errors from uvloop when TCP transports
+    still have pending connect/write callbacks at shutdown time.
+    """
+    pending = asyncio.all_tasks(loop)
+    for task in pending:
+        task.cancel()
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    loop.run_until_complete(loop.shutdown_asyncgens())
+
+
 ### Start Server ###
 def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health_port: int = WORKER_HEALTH_PORT, shared_state=None):
     """thread worker function"""
@@ -953,4 +967,5 @@ def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health
         pass
     finally:
         if loop:
-            loop.close()  # Close the event loop
+            _cancel_remaining_tasks(loop)
+            loop.close()

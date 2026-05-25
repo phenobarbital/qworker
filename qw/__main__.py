@@ -12,6 +12,7 @@ from qw.conf import (
     WORKER_HEALTH_PORT,
 )
 from .process import SpawnProcess
+from .server import _cancel_remaining_tasks
 from .utils import cPrint
 from .utils.events import enable_uvloop
 
@@ -106,6 +107,7 @@ def run_start(args: argparse.Namespace) -> None:
             process.terminate()
     finally:
         cPrint('Shutdown all workers ...', level='WARN')
+        _cancel_remaining_tasks(loop)
         loop.close()
 
 

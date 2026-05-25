@@ -19,7 +19,7 @@ from .conf import (
     QW_MAX_WORKERS
 )
 
-from .server import start_server
+from .server import start_server, _cancel_remaining_tasks
 from .supervisor import ProcessSupervisor
 
 JOB_LIST = []
@@ -179,6 +179,7 @@ class SpawnProcess:
         except KeyboardInterrupt:
             loop.run_until_complete(notify_worker.stop())
         finally:
+            _cancel_remaining_tasks(loop)
             loop.close()
 
     async def start_redis(self):
