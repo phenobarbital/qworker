@@ -647,7 +647,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -657,7 +657,8 @@
       "parallelism_notes": "Imports from TASK-032 models. Sequential after TASK-032.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-033-execution-backend-abstraction.md"
+      "completed_at": "2026-05-25T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-033-execution-backend-abstraction.md"
     },
     {
       "id": "TASK-034",
