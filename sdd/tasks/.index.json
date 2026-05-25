@@ -784,7 +784,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
@@ -792,7 +792,8 @@
       "parallelism_notes": "Only modifies qw/conf.py and pyproject.toml. No file overlap with TASK-032. Parallel at start.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-040-config-extension.md"
+      "completed_at": "2026-05-25T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-040-config-extension.md"
     },
     {
       "id": "TASK-041",
