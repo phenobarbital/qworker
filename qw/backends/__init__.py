@@ -13,6 +13,14 @@ from .models import (
 from .base import BaseExecutionBackend, BackendRegistry
 from .local import LocalBackend
 
+# DockerBackend is conditionally imported (optional dependency)
+try:
+    from .docker import DockerBackend
+    _HAS_DOCKER_BACKEND = True
+except ImportError:
+    DockerBackend = None  # type: ignore[assignment,misc]
+    _HAS_DOCKER_BACKEND = False
+
 __all__ = [
     "ContainerResources",
     "ContainerConfig",
@@ -23,4 +31,5 @@ __all__ = [
     "BaseExecutionBackend",
     "BackendRegistry",
     "LocalBackend",
+    "DockerBackend",
 ]
