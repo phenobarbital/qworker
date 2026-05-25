@@ -2,7 +2,8 @@
 
 **Date**: 2026-05-25
 **Author**: Jesus Lara
-**Status**: discussion
+**Status**: accepted
+**Spec**: sdd/specs/launch-docker-k8s.spec.md
 
 ---
 
