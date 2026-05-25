@@ -50,6 +50,16 @@ WORKER_DRAIN_TIMEOUT = config.getint('WORKER_DRAIN_TIMEOUT', fallback=300)
 SUPERVISOR_CHECK_INTERVAL = config.getint('SUPERVISOR_CHECK_INTERVAL', fallback=10)
 SUPERVISOR_KILL_GRACE = config.getint('SUPERVISOR_KILL_GRACE', fallback=10)
 
+## Container Execution Backends
+DOCKER_HOST = config.get('DOCKER_HOST', fallback=None)
+K8S_NAMESPACE = config.get('K8S_NAMESPACE', fallback='default')
+K8S_KUBECONFIG = config.get('K8S_KUBECONFIG', fallback=None)
+CONTAINER_TASK_MAPPING_FILE = config.get('CONTAINER_TASK_MAPPING_FILE', fallback=None)
+RESOURCE_OVERFLOW_ENABLED = config.getboolean('RESOURCE_OVERFLOW_ENABLED', fallback=False)
+RESOURCE_RECOVER_THRESHOLD = config.getint('RESOURCE_RECOVER_THRESHOLD', fallback=75)
+CONTAINER_POLL_INTERVAL = config.getint('CONTAINER_POLL_INTERVAL', fallback=5)
+CONTAINER_DEFAULT_TIMEOUT = config.getint('CONTAINER_DEFAULT_TIMEOUT', fallback=30)
+
 ## Queue Consumed Callback
 WORKER_QUEUE_CALLBACK = config.get(
     'WORKER_QUEUE_CALLBACK', fallback=None
