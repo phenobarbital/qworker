@@ -667,7 +667,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -677,7 +677,8 @@
       "parallelism_notes": "Creates qw/backends/local.py. Can run in parallel with TASK-035, TASK-036 after TASK-033.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-034-local-backend.md"
+      "completed_at": "2026-05-25T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-034-local-backend.md"
     },
     {
       "id": "TASK-035",
