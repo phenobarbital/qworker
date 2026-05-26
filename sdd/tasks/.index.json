@@ -830,7 +830,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [],
@@ -838,8 +838,8 @@
       "parallelism_notes": "Leaf task \u2014 creates qw/registry.py with no file overlap with TASK-043. Can run in parallel with TASK-043.",
       "assigned_to": null,
       "started_at": "2026-05-26T00:00:00Z",
-      "completed_at": null,
-      "file": "sdd/tasks/active/TASK-042-handler-registry.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-042-handler-registry.md"
     },
     {
       "id": "TASK-043",
