@@ -8,7 +8,7 @@ base_branch: dev
 **Feature ID**: FEAT-007
 **Date**: 2026-05-26
 **Author**: Jesus Lara
-**Status**: draft
+**Status**: approved
 **Target version**: TBD
 
 ---
@@ -668,11 +668,11 @@ No new mandatory dependencies. `querysource` is optional — added to
 
 - [x] Should `HandlerRegistry` support handler removal/deregistration? — *Owner: Jesus*:
   No, not for v1.
-- [ ] Should the health endpoint expose the list of registered handlers? — *Owner: Jesus*
+- [ ] Should the health endpoint expose the list of registered handlers? — *Owner: Jesus*: yes
 - [ ] Should handler names be validated (must contain a dot, max length) or is any
-  non-empty string valid? — *Owner: Jesus*
+  non-empty string valid? — *Owner: Jesus*: yes
 - [ ] Should `handle_named_handler` enforce that handlers are async, or also support
-  sync handlers run in a thread executor? — *Owner: Jesus*
+  sync handlers run in a thread executor? — *Owner: Jesus*: only async
 
 ---
 
