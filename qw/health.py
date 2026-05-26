@@ -78,6 +78,7 @@ class HealthServer:
         port: int = 8080,
         worker_name: str = "",
         shared_state=None,
+        backend_dispatcher=None,
     ):
         self._queue = queue
         self._host = host
@@ -87,6 +88,9 @@ class HealthServer:
         # readiness probe reports 503 for draining workers and the
         # /supervisor/status endpoint returns a per-worker snapshot.
         self._shared_state = shared_state
+        # FEAT-006: optional BackendDispatcher — when present, adds backend
+        # health info to the /supervisor/status endpoint response.
+        self._dispatcher = backend_dispatcher
         self._server: Optional[asyncio.AbstractServer] = None
         self.logger = logging.getLogger("QW.HealthServer")
 
@@ -289,5 +293,67 @@ class HealthServer:
             body = json_encoder({"error": str(exc), "workers": {}})
             return HTTP_503, body
 
-        body = json_encoder({"workers": workers})
+        # FEAT-006: include backend health if dispatcher is wired in
+        backend_info = self._get_backend_status()
+
+        response: dict = {"workers": workers}
+        if backend_info is not None:
+            response["backends"] = backend_info
+
+        body = json_encoder(response)
         return HTTP_200, body
+
+    def _get_backend_status(self) -> Optional[dict]:
+        """Collect backend status from BackendDispatcher synchronously.
+
+        Called from the sync _supervisor_status method. Uses cached/simple
+        checks rather than async health_check() to avoid event loop issues.
+
+        Returns:
+            Dict with overflow_active, memory_percent, and per-backend status;
+            None if no dispatcher is configured.
+        """
+        if self._dispatcher is None:
+            return None
+
+        result: dict = {}
+        try:
+            # Overflow and memory state — synchronous, no I/O
+            monitor = getattr(self._dispatcher, "_monitor", None)
+            if monitor is not None:
+                result["overflow_active"] = getattr(monitor, "is_overflowing", False)
+                result["memory_percent"] = monitor.get_memory_percent()
+            else:
+                result["overflow_active"] = False
+                result["memory_percent"] = None
+
+            # Per-backend status — synchronous attributes only
+            backends_summary: dict = {}
+            local = getattr(self._dispatcher, "_local", None)
+            if local is not None:
+                backends_summary["local"] = {"status": "ok", "type": "local"}
+
+            docker = getattr(self._dispatcher, "_docker", None)
+            if docker is not None:
+                docker_tasks = getattr(docker, "_tasks", {})
+                backends_summary["docker"] = {
+                    "status": "configured",
+                    "active_containers": len(docker_tasks),
+                }
+
+            k8s = getattr(self._dispatcher, "_k8s", None)
+            if k8s is not None:
+                k8s_tasks = getattr(k8s, "_tasks", {})
+                k8s_namespace = getattr(k8s, "_namespace", None)
+                backends_summary["k8s"] = {
+                    "status": "configured",
+                    "active_pods": len(k8s_tasks),
+                    "namespace": k8s_namespace,
+                }
+
+            result["backends"] = backends_summary
+        except Exception as exc:
+            self.logger.warning("Failed to collect backend status: %s", exc)
+            result["error"] = str(exc)
+
+        return result
