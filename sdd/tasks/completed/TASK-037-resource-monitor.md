@@ -215,4 +215,7 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: Claude Sonnet 4.6 (sdd-worker)
+**Date**: 2026-05-26
+**Notes**: All 16 tests pass. ResourceMonitor implements hysteresis logic with HAS_PSUTIL guard for optional dependency. _override_memory enables testing without real psutil. Also added is_overflowing property and reset() method.
+**Deviations from spec**: Added is_overflowing property and reset() method as convenient extras; they don't deviate from spec requirements.

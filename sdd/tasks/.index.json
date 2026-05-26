@@ -727,7 +727,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -737,7 +737,8 @@
       "parallelism_notes": "Creates qw/backends/monitor.py. No file overlap with TASK-034/035/036. Parallel with backends after TASK-040.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-037-resource-monitor.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-037-resource-monitor.md"
     },
     {
       "id": "TASK-038",
