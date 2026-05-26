@@ -57,6 +57,10 @@ data = [
 docker = ["docker>=7.0"]
 k8s = ["kubernetes>=29.0"]
 containers = ["docker>=7.0", "kubernetes>=29.0", "psutil>=5.9"]
+querysource = ["querysource"]
+
+[project.entry-points."qworker.handlers"]
+"querysource.remote.query_handler" = "qw.handlers.querysource:query_handler"
 
 [project.scripts]
 qw = "qw.__main__:main"
