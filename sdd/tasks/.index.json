@@ -927,7 +927,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "medium",
       "effort": "M",
       "depends_on": [
@@ -941,8 +941,8 @@
       "parallelism_notes": "Final wiring task \u2014 modifies pyproject.toml and conf.py, writes integration tests. Depends on all prior FEAT-007 tasks.",
       "assigned_to": null,
       "started_at": "2026-05-26T00:00:00Z",
-      "completed_at": null,
-      "file": "sdd/tasks/active/TASK-047-package-config-integration.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-047-package-config-integration.md"
     }
   ]
 }
