@@ -278,4 +278,7 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: Claude Sonnet 4.6 (sdd-worker)
+**Date**: 2026-05-26
+**Notes**: All 18 tests pass. BackendDispatcher implements 4-priority routing: explicit container_config > task mapping file (fnmatch patterns) > resource overflow > local default. QueueManager now accepts optional dispatcher param and routes container tasks through it. load_task_mappings supports YAML (.yaml/.yml) and TOML (.toml) files. ContainerTaskMapping uses nested config: ContainerConfig field (not flat backend/image fields as spec example showed — the model spec from TASK-032 was authoritative).
+**Deviations from spec**: ContainerTaskMapping uses `config: ContainerConfig` (nested) not flat `backend/image` fields — this is correct per the model definition in TASK-032. All 221 existing tests pass (no regression).

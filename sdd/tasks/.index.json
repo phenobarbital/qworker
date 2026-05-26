@@ -767,7 +767,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "XL",
       "depends_on": [
@@ -781,7 +781,8 @@
       "parallelism_notes": "Integration task \u2014 imports from all backends, modifies qw/queues/manager.py. Must follow all backend tasks.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-039-backend-dispatcher.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-039-backend-dispatcher.md"
     },
     {
       "id": "TASK-040",
