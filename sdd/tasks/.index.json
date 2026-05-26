@@ -907,7 +907,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -917,8 +917,8 @@
       "parallelism_notes": "Creates qw/handlers/querysource.py \u2014 depends on TASK-042 (HandlerRegistry for entry_points discovery). Sequential.",
       "assigned_to": null,
       "started_at": "2026-05-26T00:00:00Z",
-      "completed_at": null,
-      "file": "sdd/tasks/active/TASK-046-querysource-handler.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-046-querysource-handler.md"
     },
     {
       "id": "TASK-047",
