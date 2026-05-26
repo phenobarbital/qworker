@@ -8,6 +8,7 @@ Collection of wrappers for different kind of Objects to be launched by workers.
 
 from .func import FuncWrapper
 from .base import QueueWrapper
+from .named import NamedHandlerWrapper
 try:
     from .di_task import TaskWrapper
 except Exception as e:
@@ -20,5 +21,6 @@ except Exception as e:
 __all__ = (
     'QueueWrapper',
     'FuncWrapper',
+    'NamedHandlerWrapper',
     'TaskWrapper',
 )
