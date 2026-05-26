@@ -223,4 +223,7 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: Claude Sonnet 4.6 (sdd-worker)
+**Date**: 2026-05-26
+**Notes**: All 11 tests pass. HealthServer now accepts optional backend_dispatcher param. _supervisor_status includes a "backends" key when dispatcher is wired in, with overflow_active, memory_percent, and per-backend status dict. All 269 existing tests pass (no regression). Synchronous _get_backend_status() uses attribute access instead of async health_check() to avoid event loop issues in the sync _supervisor_status handler.
+**Deviations from spec**: Used attribute inspection (_monitor, _local, _docker, _k8s) instead of helper methods (is_overflowing/get_memory_percent/get_health_summary) on the dispatcher — these methods don't exist on BackendDispatcher. The _get_backend_status() directly accesses the dispatcher's internal attributes for sync operation.
