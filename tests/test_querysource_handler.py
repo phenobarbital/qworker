@@ -129,7 +129,7 @@ class TestQuerySourceHandler:
                 del sys.modules["qw.handlers.querysource"]
             from qw.handlers.querysource import query_handler
 
-            with pytest.raises(ImportError, match="querysource is not installed"):
+            with pytest.raises(ImportError, match="querysource.remote.query_handler"):
                 await query_handler("some_slug")
 
     def test_module_level_no_querysource_import(self):
@@ -171,3 +171,84 @@ class TestQuerySourceHandler:
     def test_package_importable(self):
         """qw.handlers package is importable."""
         import qw.handlers  # noqa: F401
+
+    @pytest.mark.asyncio
+    async def test_queryobject_exception_propagates(self):
+        """An exception raised by QueryObject.query() propagates out of query_handler."""
+        captured = {}
+
+        class FailingQueryObject:
+            def __init__(self, name, query, queue=None, request=None, loop=None):
+                captured["name"] = name
+                self._queue = queue
+
+            async def build_provider(self):
+                pass
+
+            async def query(self):
+                # Raise without putting anything in the queue
+                raise RuntimeError("QuerySource internal error")
+
+        mock_qs_obj = MagicMock()
+        mock_qs_obj.QueryObject = FailingQueryObject
+
+        mock_qs = MagicMock()
+        mock_qs_queries = MagicMock()
+        mock_qs_queries.obj = mock_qs_obj
+
+        modules = {
+            "querysource": mock_qs,
+            "querysource.queries": mock_qs_queries,
+            "querysource.queries.obj": mock_qs_obj,
+        }
+
+        with __import__("unittest.mock", fromlist=["patch"]).patch.dict(
+            sys.modules, modules
+        ):
+            if "qw.handlers.querysource" in sys.modules:
+                del sys.modules["qw.handlers.querysource"]
+            from qw.handlers.querysource import query_handler
+
+            with pytest.raises(RuntimeError, match="QuerySource internal error"):
+                await query_handler("test_slug")
+
+    @pytest.mark.asyncio
+    async def test_queue_timeout_raises_timeout_error(self, sample_df):
+        """If QueryObject never puts a result in the queue, TimeoutError is raised."""
+        class HangingQueryObject:
+            def __init__(self, name, query, queue=None, request=None, loop=None):
+                pass
+
+            async def build_provider(self):
+                pass
+
+            async def query(self):
+                # Never puts anything into the queue — simulates a silent failure
+                pass
+
+        mock_qs_obj = MagicMock()
+        mock_qs_obj.QueryObject = HangingQueryObject
+
+        mock_qs = MagicMock()
+        mock_qs_queries = MagicMock()
+        mock_qs_queries.obj = mock_qs_obj
+
+        modules = {
+            "querysource": mock_qs,
+            "querysource.queries": mock_qs_queries,
+            "querysource.queries.obj": mock_qs_obj,
+        }
+
+        with __import__("unittest.mock", fromlist=["patch"]).patch.dict(
+            sys.modules, modules
+        ):
+            if "qw.handlers.querysource" in sys.modules:
+                del sys.modules["qw.handlers.querysource"]
+            # Patch WORKER_TASK_TIMEOUT to a very small value to keep test fast
+            with __import__("unittest.mock", fromlist=["patch"]).patch(
+                "qw.conf.WORKER_TASK_TIMEOUT", 0.05
+            ):
+                from qw.handlers.querysource import query_handler
+
+                with pytest.raises(TimeoutError, match="timed out"):
+                    await query_handler("hanging_slug")

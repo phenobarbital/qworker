@@ -9,8 +9,10 @@ Resolution order:
   3. Raise QWException if not found
 """
 import importlib.metadata
+from collections.abc import Callable
 from navconfig.logging import logging
 
+from qw.conf import HANDLER_ENTRY_POINTS_GROUP
 from qw.exceptions import QWException
 
 
@@ -30,12 +32,12 @@ class HandlerRegistry:
 
     def __init__(self) -> None:
         """Initialise an empty registry."""
-        self._handlers: dict[str, callable] = {}
-        self._cache: dict[str, callable] = {}
+        self._handlers: dict[str, Callable] = {}
+        self._cache: dict[str, Callable] = {}
         self._entry_points_scanned: bool = False
         self.logger = logging.getLogger('QW.Registry')
 
-    def register(self, name: str, handler: callable) -> None:
+    def register(self, name: str, handler: Callable) -> None:
         """Register a handler by name. Overwrites existing entry.
 
         Args:
@@ -47,7 +49,7 @@ class HandlerRegistry:
         self._cache.pop(name, None)
         self.logger.debug("Registered handler: %s", name)
 
-    def resolve(self, name: str) -> callable:
+    def resolve(self, name: str) -> Callable:
         """Resolve a handler name to a callable.
 
         Resolution order:
@@ -109,9 +111,12 @@ class HandlerRegistry:
 
         Results are stored in _cache. Only called once per process.
         """
+        # Mark scanned BEFORE the try block so that a total scan failure never
+        # triggers infinite retry loops on subsequent resolve() calls. A failed
+        # scan is permanent for the lifetime of this process instance.
         self._entry_points_scanned = True
         try:
-            eps = importlib.metadata.entry_points(group="qworker.handlers")
+            eps = importlib.metadata.entry_points(group=HANDLER_ENTRY_POINTS_GROUP)
             for ep in eps:
                 try:
                     handler = ep.load()
@@ -124,7 +129,7 @@ class HandlerRegistry:
                         "Failed to load entry_point handler %r: %s", ep.name, exc
                     )
         except Exception as exc:  # pylint: disable=broad-except
-            self.logger.warning("Entry_points scan failed: %s", exc)
+            self.logger.error("Entry_points scan failed: %s", exc)
 
 
 # Module-level singleton — each worker process gets its own instance

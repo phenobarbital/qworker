@@ -70,7 +70,6 @@ class TestHandlerRegistry:
     def test_entry_points_scanned_only_once(self, registry):
         """Entry_points are not re-scanned on repeated calls."""
         with patch("importlib.metadata.entry_points", return_value=[]) as mock_eps:
-            registry.resolve("x") if False else None  # won't run
             try:
                 registry.resolve("first.miss")
             except QWException:

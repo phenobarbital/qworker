@@ -1,4 +1,10 @@
-"""Unit tests for QClient string-based dispatch (TASK-044)."""
+"""Unit tests for QClient string-based dispatch (TASK-044).
+
+Note: all test methods are ``async def`` even though they don't await anything.
+QClient.__init__ calls ``asyncio.get_event_loop()``, which requires a running
+event loop.  The ``asyncio_mode = "auto"`` setting in pyproject.toml ensures
+that async test methods run inside an event loop, satisfying that requirement.
+"""
 import pytest
 from qw.client import QClient
 from qw.wrappers.named import NamedHandlerWrapper

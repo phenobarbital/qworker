@@ -21,6 +21,8 @@ import asyncio
 
 from navconfig.logging import logging
 
+from qw.conf import WORKER_TASK_TIMEOUT
+
 logger = logging.getLogger('QW.Handler.QuerySource')
 
 
@@ -66,8 +68,8 @@ async def query_handler(
         from querysource.queries.obj import QueryObject  # lazy import — avoids heavy startup
     except ImportError as exc:
         raise ImportError(
-            "querysource is not installed. "
-            "Install it with: pip install qworker[querysource]"
+            "Handler 'querysource.remote.query_handler' not found. "
+            "Is querysource installed? Install with: pip install qworker[querysource]"
         ) from exc
 
     queue: asyncio.Queue = asyncio.Queue()
@@ -91,11 +93,18 @@ async def query_handler(
         query=query,
         queue=queue,
         request=None,
-        loop=asyncio.get_running_loop(),
+        # loop= omitted: deprecated since Python 3.8 and removed in Python 3.12
     )
 
     await query_obj.build_provider()
     await query_obj.query()
 
-    result_dict = await queue.get()
+    try:
+        result_dict = await asyncio.wait_for(queue.get(), timeout=WORKER_TASK_TIMEOUT)
+    except asyncio.TimeoutError as exc:
+        raise TimeoutError(
+            f"query_handler timed out after {WORKER_TASK_TIMEOUT}s waiting for "
+            f"QueryObject result (query={name!r}). The query may have raised an "
+            "exception without putting a result in the queue."
+        ) from exc
     return result_dict[name]

@@ -743,8 +743,8 @@ class QWorker:
         """Execute a NamedHandlerWrapper by resolving its handler name via the registry.
 
         Resolution order: explicit register() → entry_points → QWException.
-        Supports async handlers (awaited directly).
-        Sync handlers are not supported per spec — callers should use async handlers.
+        Only async coroutine handlers are supported — sync handlers are rejected
+        with a QWException so the client receives a clear error over the wire.
 
         Args:
             task: The NamedHandlerWrapper carrying handler name + args/kwargs.
@@ -756,16 +756,12 @@ class QWorker:
             self._state.task_executing(task_id, source="tcp")
         try:
             handler = handler_registry.resolve(task.handler_name)
-            if asyncio.iscoroutinefunction(handler):
-                result = await handler(*task.args, **task.kwargs)
-            else:
-                # Run sync handler in a thread executor to avoid blocking the event loop
-                loop = asyncio.get_running_loop()
-                from concurrent.futures import ThreadPoolExecutor
-                from functools import partial as _partial
-                fn = _partial(handler, *task.args, **task.kwargs)
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    result = await loop.run_in_executor(executor, fn)
+            if not asyncio.iscoroutinefunction(handler):
+                raise QWException(
+                    f"Handler {task.handler_name!r} must be an async coroutine function. "
+                    "Sync handlers are not supported — use 'async def'."
+                )
+            result = await handler(*task.args, **task.kwargs)
             if self._state is not None:
                 self._state.task_completed(task_id, result="success", source="tcp")
             return await self.return_result(writer, result, task, uid)

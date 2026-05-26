@@ -41,13 +41,19 @@ class NamedHandlerWrapper(QueueWrapper):
         # Force queued=False — named handlers bypass the queue
         kwargs.setdefault('queued', False)
         # Pass args/kwargs to base so UUID, debug, container_config are initialised.
-        # NOTE: Python creates a *new* dict for **kwargs in super().__init__, so
-        # QueueWrapper's `kwargs.pop('queued')` does NOT modify our local `kwargs`.
+        # NOTE: `**kwargs` unpacking in super().__init__ creates a *new* dict inside
+        # QueueWrapper, so QueueWrapper's internal `.pop('queued')` does NOT affect
+        # our local `kwargs` variable here.  However, our local `kwargs` STILL contains
+        # the internal keys (e.g. 'queued' from setdefault above), so we must strip
+        # them explicitly below before storing as handler arguments.
         super().__init__(*args, **kwargs)
         self._handler_name: str = handler_name
         # Re-assign args so they contain the handler call arguments (not the coro slot).
         self.args = args
         # Strip QueueWrapper-internal keys so they are not forwarded to the handler.
+        # 'queued'/'debug'/'container_config' are QueueWrapper lifecycle flags.
+        # 'id' is consumed by QueueWrapper.__init__ as the task UUID — it is NOT
+        # a handler-level 'id' parameter and must not be forwarded to the handler.
         _internal_keys = ('queued', 'debug', 'id', 'container_config')
         self.kwargs = {k: v for k, v in kwargs.items() if k not in _internal_keys}
 

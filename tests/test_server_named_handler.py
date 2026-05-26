@@ -139,6 +139,67 @@ class TestServerNamedHandler:
             assert "handler failed" in str(err)
 
     @pytest.mark.asyncio
+    async def test_unknown_handler_serialized_as_qwexception_over_wire(self):
+        """When registry can't resolve a name, handle_named_handler serializes
+        QWException via cloudpickle and sends it to the client over the wire."""
+        import uuid
+        import cloudpickle
+        from qw.server import QWorker
+        from qw.exceptions import QWException
+
+        wrapper = NamedHandlerWrapper("nonexistent.handler", "arg1")
+        mock_writer = AsyncMock()
+
+        with patch("qw.server.handler_registry") as mock_registry, \
+             patch.object(QWorker, "closing_writer", new_callable=AsyncMock) as mock_close:
+            mock_registry.resolve.side_effect = QWException(
+                "Handler not found: 'nonexistent.handler'"
+            )
+
+            worker = object.__new__(QWorker)
+            worker._state = None
+            worker.logger = MagicMock()
+
+            await worker.handle_named_handler(wrapper, uuid.uuid4(), mock_writer)
+
+            # closing_writer must have been called with a serialized QWException
+            mock_close.assert_called_once()
+            result_bytes = mock_close.call_args[0][1]
+            err = cloudpickle.loads(result_bytes)
+            assert isinstance(err, QWException)
+            assert "nonexistent.handler" in str(err)
+
+    @pytest.mark.asyncio
+    async def test_sync_handler_rejected_with_qwexception(self):
+        """A sync (non-coroutine) handler is rejected with QWException over the wire."""
+        import uuid
+        import cloudpickle
+        from qw.server import QWorker
+
+        def sync_handler(*args, **kwargs):  # NOT async
+            return "sync-result"
+
+        wrapper = NamedHandlerWrapper("sync.handler", "arg1")
+        mock_writer = AsyncMock()
+
+        with patch("qw.server.handler_registry") as mock_registry, \
+             patch.object(QWorker, "closing_writer", new_callable=AsyncMock) as mock_close:
+            mock_registry.resolve.return_value = sync_handler
+
+            worker = object.__new__(QWorker)
+            worker._state = None
+            worker.logger = MagicMock()
+
+            await worker.handle_named_handler(wrapper, uuid.uuid4(), mock_writer)
+
+            # Should send a QWException back to the client (not raise on the server)
+            mock_close.assert_called_once()
+            result_bytes = mock_close.call_args[0][1]
+            err = cloudpickle.loads(result_bytes)
+            assert isinstance(err, QWException)
+            assert "async" in str(err).lower() or "sync.handler" in str(err)
+
+    @pytest.mark.asyncio
     async def test_connection_handler_routes_named_wrapper_correctly(self):
         """connection_handler dispatches NamedHandlerWrapper before QueueWrapper."""
         # Verify the isinstance order is correct by checking that NamedHandlerWrapper
