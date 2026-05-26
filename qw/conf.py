@@ -110,6 +110,11 @@ PACKAGE_LIST = config.getlist(
     'PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig')
 )
 
+# Handler registry — entry_points group used for named handler discovery
+HANDLER_ENTRY_POINTS_GROUP = config.get(
+    'HANDLER_ENTRY_POINTS_GROUP', fallback='qworker.handlers'
+)
+
 ## Telegram:
 # Telegram credentials
 TELEGRAM_BOT_TOKEN = config.get("TELEGRAM_BOT_TOKEN")
