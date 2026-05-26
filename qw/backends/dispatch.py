@@ -22,6 +22,7 @@ from .models import ContainerConfig, ContainerTaskMapping, TaskResult
 from .monitor import ResourceMonitor
 from ..conf import (
     CONTAINER_DEFAULT_TIMEOUT,
+    CONTAINER_FIRE_FORGET_GRACE,
     CONTAINER_POLL_INTERVAL,
     CONTAINER_TASK_MAPPING_FILE,
     WORKER_RETRY_COUNT,
@@ -52,7 +53,7 @@ class BackendDispatcher:
         docker_backend: Optional[Any] = None,
         k8s_backend: Optional[Any] = None,
         resource_monitor: Optional[ResourceMonitor] = None,
-        task_mappings: Optional[list] = None,
+        task_mappings: Optional[list[ContainerTaskMapping]] = None,
     ) -> None:
         self.logger = logging.getLogger("QW.Backend.Dispatcher")
         self._local = local_backend
@@ -104,13 +105,13 @@ class BackendDispatcher:
             if container_config.backend == "docker":
                 if self._docker is None:
                     raise RuntimeError(
-                        "Task requested Docker backend but no DockerBackend is not configured"
+                        "Task requested Docker backend but DockerBackend is not configured"
                     )
                 return self._docker
             elif container_config.backend == "k8s":
                 if self._k8s is None:
                     raise RuntimeError(
-                        "Task requested K8s backend but no K8sBackend is not configured"
+                        "Task requested K8s backend but K8sBackend is not configured"
                     )
                 return self._k8s
 
@@ -253,8 +254,30 @@ class BackendDispatcher:
                     await asyncio.sleep(WORKER_RETRY_INTERVAL)
                 continue
 
-            # Fire-and-forget: return immediately after dispatch
+            # Fire-and-forget: return immediately after dispatch.
+            # Schedule cleanup in a background task after a grace period so
+            # containers are not leaked. The grace period allows the container
+            # to finish and its output to be collected even though the caller
+            # does not wait for a result.
             if fire_and_forget:
+                async def _deferred_cleanup(
+                    _backend: BaseExecutionBackend,
+                    _task_id: uuid.UUID,
+                    _grace: int,
+                ) -> None:
+                    await asyncio.sleep(_grace)
+                    try:
+                        await _backend.cleanup(_task_id)
+                    except Exception as _exc:
+                        self.logger.debug(
+                            "Fire-and-forget cleanup error for %s: %s",
+                            _task_id,
+                            _exc,
+                        )
+
+                asyncio.create_task(
+                    _deferred_cleanup(backend, task_id, CONTAINER_FIRE_FORGET_GRACE)
+                )
                 return TaskResult(
                     task_id=task_id,
                     success=True,
@@ -310,6 +333,7 @@ class BackendDispatcher:
         """
         deadline = start + timeout
         poll_interval = CONTAINER_POLL_INTERVAL
+        status: str = "pending"
 
         while time.monotonic() < deadline:
             try:
@@ -428,7 +452,21 @@ class BackendDispatcher:
         result = []
         for item in mappings_data:
             try:
-                result.append(ContainerTaskMapping(**item))
+                item = dict(item)  # defensive copy
+                if "task_pattern" not in item:
+                    raise ValueError("Missing required key 'task_pattern'")
+                task_pattern = item.pop("task_pattern")
+                # Reconstruct nested ContainerConfig from flat YAML/TOML keys.
+                # The documented format uses flat keys (backend, image, env, …)
+                # rather than a nested 'config' dict.
+                if "config" in item:
+                    # Already nested — accept both formats
+                    config = ContainerConfig(**item.pop("config"))
+                else:
+                    config = ContainerConfig(**item)
+                result.append(
+                    ContainerTaskMapping(task_pattern=task_pattern, config=config)
+                )
             except Exception as exc:
                 raise ValueError(f"Invalid mapping entry {item!r}: {exc}") from exc
 

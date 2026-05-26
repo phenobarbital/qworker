@@ -451,7 +451,7 @@ class QueueManager:
                     )
                 elif isinstance(result, BaseException):
                     ## TODO: checking retry info from Task.
-                    if task.retry() is True:  # task was marked to retry
+                    if hasattr(task, "retry") and task.retry() is True:  # task was marked to retry
                         if task.retries < WORKER_RETRY_COUNT - 1:
                             task.add_retries()
                             self.logger.warning(

@@ -82,6 +82,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 addopts = [
   "--strict-config",
   "--strict-markers",

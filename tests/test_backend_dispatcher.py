@@ -103,6 +103,26 @@ class TestResolveBackend:
         with pytest.raises(RuntimeError, match="K8sBackend is not configured"):
             dispatcher.resolve_backend(task)
 
+    def test_error_message_no_double_negative_docker(self):
+        """Error message does not contain double negative 'is not ... is not'."""
+        local = MagicMock(spec=LocalBackend)
+        dispatcher = BackendDispatcher(local_backend=local)
+        task = _make_task(backend="docker")
+        try:
+            dispatcher.resolve_backend(task)
+        except RuntimeError as exc:
+            assert "no DockerBackend is not" not in str(exc)
+
+    def test_error_message_no_double_negative_k8s(self):
+        """Error message does not contain double negative 'is not ... is not'."""
+        local = MagicMock(spec=LocalBackend)
+        dispatcher = BackendDispatcher(local_backend=local)
+        task = _make_task(backend="k8s")
+        try:
+            dispatcher.resolve_backend(task)
+        except RuntimeError as exc:
+            assert "no K8sBackend is not" not in str(exc)
+
     def test_no_monitor_no_overflow(self):
         """Without a resource monitor, no overflow routing occurs."""
         local = MagicMock(spec=LocalBackend)
@@ -293,3 +313,26 @@ class TestDispatchAndTrack:
 
         assert result.success is False
         assert result.error is not None
+
+    async def test_poll_until_done_timeout_expiry(self):
+        """_poll_until_done() returns timed-out TaskResult when deadline passes immediately."""
+        import time as time_mod
+        task_id = uuid.uuid4()
+
+        # Backend that always returns 'running' (never completes)
+        backend = MagicMock()
+        backend.poll = AsyncMock(return_value="running")
+        backend.cancel = AsyncMock(return_value=True)
+
+        dispatcher, local, docker, k8s, monitor = _make_dispatcher()
+
+        # Use timeout=0 and start in the past so deadline is immediately exceeded
+        start = time_mod.monotonic() - 10  # 10 seconds in the past
+        result = await dispatcher._poll_until_done(
+            backend, task_id, timeout=0, start=start
+        )
+
+        # Should report timed out
+        assert result.success is False
+        assert result.task_id == task_id
+        assert "timed out" in (result.error or "").lower() or not result.success

@@ -58,7 +58,10 @@ CONTAINER_TASK_MAPPING_FILE = config.get('CONTAINER_TASK_MAPPING_FILE', fallback
 RESOURCE_OVERFLOW_ENABLED = config.getboolean('RESOURCE_OVERFLOW_ENABLED', fallback=False)
 RESOURCE_RECOVER_THRESHOLD = config.getint('RESOURCE_RECOVER_THRESHOLD', fallback=75)
 CONTAINER_POLL_INTERVAL = config.getint('CONTAINER_POLL_INTERVAL', fallback=5)
+# CONTAINER_DEFAULT_TIMEOUT: task execution timeout in seconds
 CONTAINER_DEFAULT_TIMEOUT = config.getint('CONTAINER_DEFAULT_TIMEOUT', fallback=30)
+# CONTAINER_FIRE_FORGET_GRACE: seconds to wait before cleaning up fire-and-forget containers
+CONTAINER_FIRE_FORGET_GRACE = config.getint('CONTAINER_FIRE_FORGET_GRACE', fallback=300)
 
 ## Queue Consumed Callback
 WORKER_QUEUE_CALLBACK = config.get(

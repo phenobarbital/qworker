@@ -41,7 +41,7 @@ class TestContainerConfig:
         """ContainerConfig has correct default values for optional fields."""
         cfg = ContainerConfig(backend="docker", image="x")
         assert cfg.env == {}
-        assert cfg.volumes == {}
+        assert cfg.volumes == []
         assert cfg.resources is None
         assert cfg.timeout is None
         assert cfg.namespace is None
@@ -55,15 +55,24 @@ class TestContainerConfig:
         assert cfg.resources.memory_limit == "512Mi"
 
     def test_with_env_and_volumes(self):
-        """ContainerConfig stores env vars and volume mounts."""
+        """ContainerConfig stores env vars and volume mounts (list format)."""
         cfg = ContainerConfig(
             backend="docker",
             image="myimage:latest",
             env={"MY_VAR": "value"},
-            volumes={"/host/path": "/container/path"},
+            volumes=["/host/path:/container/path"],
         )
         assert cfg.env == {"MY_VAR": "value"}
-        assert cfg.volumes == {"/host/path": "/container/path"}
+        assert cfg.volumes == ["/host/path:/container/path"]
+
+    def test_volumes_readonly_format(self):
+        """ContainerConfig stores read-only volume spec with ':ro' suffix."""
+        cfg = ContainerConfig(
+            backend="docker",
+            image="myimage:latest",
+            volumes=["/host/data:/container/data:ro"],
+        )
+        assert cfg.volumes == ["/host/data:/container/data:ro"]
 
     def test_fire_and_forget_flag(self):
         """ContainerConfig stores fire_and_forget=True when set."""

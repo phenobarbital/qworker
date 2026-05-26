@@ -1,14 +1,12 @@
 """Execution backend abstraction for QWorker.
 
-Defines the BaseExecutionBackend ABC that all execution backends implement,
-and BackendRegistry for registering/resolving backends by name.
+Defines the BaseExecutionBackend ABC that all execution backends implement.
 """
-import logging
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
-from .models import ContainerConfig, TaskResult
+from .models import TaskResult
 
 
 class BaseExecutionBackend(ABC):
@@ -88,56 +86,3 @@ class BaseExecutionBackend(ABC):
         """
 
 
-class BackendRegistry:
-    """Registry for resolving execution backends by name.
-
-    A simple dict-based registry. Backends are registered by name string
-    (e.g., 'local', 'docker', 'k8s') and resolved on demand.
-
-    Example:
-        registry = BackendRegistry()
-        registry.register("local", LocalBackend)
-        backend_cls = registry.get("local")
-        backend = backend_cls()
-    """
-
-    def __init__(self) -> None:
-        self._backends: dict[str, type[BaseExecutionBackend]] = {}
-        self.logger = logging.getLogger("QW.Backend")
-
-    def register(self, name: str, cls: type[BaseExecutionBackend]) -> None:
-        """Register a backend class under the given name.
-
-        Args:
-            name: Short identifier string (e.g., 'local', 'docker', 'k8s').
-            cls: A concrete subclass of BaseExecutionBackend.
-        """
-        self._backends[name] = cls
-        self.logger.debug("Registered backend: %s -> %s", name, cls.__name__)
-
-    def get(self, name: str) -> type[BaseExecutionBackend]:
-        """Retrieve a registered backend class by name.
-
-        Args:
-            name: The name used in register().
-
-        Returns:
-            The registered backend class.
-
-        Raises:
-            KeyError: If no backend is registered under that name.
-        """
-        if name not in self._backends:
-            raise KeyError(
-                f"No execution backend registered under {name!r}. "
-                f"Available backends: {list(self._backends.keys())}"
-            )
-        return self._backends[name]
-
-    def list_backends(self) -> list[str]:
-        """Return a list of all registered backend names.
-
-        Returns:
-            List of registered name strings.
-        """
-        return list(self._backends.keys())

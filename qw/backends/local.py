@@ -9,7 +9,7 @@ import time
 import uuid
 from typing import Any, Optional
 
-from .base import BackendRegistry, BaseExecutionBackend
+from .base import BaseExecutionBackend
 from .models import TaskResult
 
 
@@ -161,7 +161,3 @@ class LocalBackend(BaseExecutionBackend):
             "active_tasks": active,
         }
 
-
-# Register the local backend in the default registry
-_default_registry = BackendRegistry()
-_default_registry.register("local", LocalBackend)

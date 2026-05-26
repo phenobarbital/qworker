@@ -248,3 +248,58 @@ class TestDockerBackend:
         mock_setup.ping.side_effect = Exception("connection refused")
         health = await backend.health_check()
         assert health["status"] == "disconnected"
+
+    async def test_volume_readonly_mount(self, backend, mock_setup):
+        """Volume spec with ':ro' suffix is passed to Docker SDK as mode='ro'."""
+        from qw.backends.models import ContainerConfig
+
+        async def fn():
+            return "ok"
+
+        cfg = ContainerConfig(
+            backend="docker",
+            image="python:3.12-slim",
+            volumes=["/host/path:/container/path:ro"],
+        )
+        task = QueueWrapper(coro=fn, container_config=cfg)
+
+        mock_container = _make_mock_container()
+        mock_setup.containers.run.return_value = mock_container
+
+        await backend.dispatch(task)
+
+        call_kwargs = mock_setup.containers.run.call_args
+        volumes_arg = call_kwargs[1].get("volumes") or call_kwargs[0][0] if call_kwargs[0] else {}
+        # Extract volumes from keyword args
+        kwargs = call_kwargs[1] if call_kwargs[1] else {}
+        volumes_passed = kwargs.get("volumes", {})
+
+        assert "/host/path" in volumes_passed
+        assert volumes_passed["/host/path"]["bind"] == "/container/path"
+        assert volumes_passed["/host/path"]["mode"] == "ro"
+
+    async def test_volume_readwrite_mount_default(self, backend, mock_setup):
+        """Volume spec without mode suffix defaults to mode='rw'."""
+        from qw.backends.models import ContainerConfig
+
+        async def fn():
+            return "ok"
+
+        cfg = ContainerConfig(
+            backend="docker",
+            image="python:3.12-slim",
+            volumes=["/host/path:/container/path"],
+        )
+        task = QueueWrapper(coro=fn, container_config=cfg)
+
+        mock_container = _make_mock_container()
+        mock_setup.containers.run.return_value = mock_container
+
+        await backend.dispatch(task)
+
+        call_kwargs = mock_setup.containers.run.call_args
+        kwargs = call_kwargs[1] if call_kwargs[1] else {}
+        volumes_passed = kwargs.get("volumes", {})
+
+        assert "/host/path" in volumes_passed
+        assert volumes_passed["/host/path"]["mode"] == "rw"

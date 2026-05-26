@@ -25,7 +25,6 @@ class QueueWrapper:
         self._container_config: Optional["ContainerConfig"] = kwargs.pop(
             'container_config', None
         )
-        # print(f"Generated UUID: {self._id} for task {getattr(self, 'task', 'unknown')}")
         self.args = args
         self.kwargs = kwargs
         self.loop = None

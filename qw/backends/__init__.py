@@ -10,7 +10,7 @@ from .models import (
     serialize_for_container,
     deserialize_from_container,
 )
-from .base import BaseExecutionBackend, BackendRegistry
+from .base import BaseExecutionBackend
 from .local import LocalBackend
 from .monitor import ResourceMonitor
 from .dispatch import BackendDispatcher
@@ -39,7 +39,6 @@ __all__ = [
     "serialize_for_container",
     "deserialize_from_container",
     "BaseExecutionBackend",
-    "BackendRegistry",
     "LocalBackend",
     "ResourceMonitor",
     "BackendDispatcher",

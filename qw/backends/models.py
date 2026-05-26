@@ -47,15 +47,24 @@ class ContainerConfig(BaseModel):
     env: dict[str, str] = Field(
         default_factory=dict, description="Environment variables"
     )
-    volumes: dict[str, str] = Field(
-        default_factory=dict, description="Host:container volume mounts"
+    volumes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Volume mount specifications. Each entry is a colon-separated string: "
+            "'/host/path:/container/path' (read-write) or "
+            "'/host/path:/container/path:ro' (read-only)."
+        ),
     )
     resources: Optional[ContainerResources] = None
     fire_and_forget: bool = Field(
         default=False, description="Skip result tracking"
     )
     timeout: Optional[int] = Field(
-        None, description="Override WORKER_TASK_TIMEOUT for this task (minutes)"
+        None,
+        description=(
+            "Override task timeout in seconds "
+            "(default: uses CONTAINER_DEFAULT_TIMEOUT)"
+        ),
     )
     namespace: Optional[str] = Field(None, description="K8s namespace override")
 

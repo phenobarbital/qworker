@@ -84,15 +84,25 @@ class DockerBackend(BaseExecutionBackend):
     def _build_volumes(self, config: ContainerConfig) -> dict:
         """Build Docker volume mount configuration.
 
+        Parses each volume spec from the list: '/host:/container' (rw) or
+        '/host:/container:ro' (read-only).
+
         Args:
-            config: ContainerConfig with volume mapping.
+            config: ContainerConfig with volume list.
 
         Returns:
-            Docker SDK volumes dict.
+            Docker SDK volumes dict suitable for containers.run(volumes=...).
         """
         volumes = {}
-        for host_path, container_path in config.volumes.items():
-            volumes[host_path] = {"bind": container_path, "mode": "rw"}
+        for vol in config.volumes:
+            parts = vol.split(":")
+            if len(parts) < 2:
+                self.logger.warning("Skipping malformed volume spec: %r", vol)
+                continue
+            host_path = parts[0]
+            container_path = parts[1]
+            mode = parts[2] if len(parts) > 2 else "rw"
+            volumes[host_path] = {"bind": container_path, "mode": mode}
         return volumes
 
     def _build_resource_opts(self, config: ContainerConfig) -> dict:

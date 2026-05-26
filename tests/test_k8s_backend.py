@@ -135,7 +135,7 @@ class TestK8sBackend:
         mock_core_v1.create_namespaced_pod.assert_called_once()
 
     async def test_dispatch_stores_pod_name(self, backend, mock_setup):
-        """dispatch() stores pod name in _tasks dict."""
+        """dispatch() stores (pod_name, namespace) tuple in _tasks dict."""
         b, mock_core_v1 = backend
         mock_core_v1.create_namespaced_pod = MagicMock()
 
@@ -143,7 +143,9 @@ class TestK8sBackend:
         task_id = await b.dispatch(task)
 
         assert task_id in b._tasks
-        assert b._tasks[task_id].startswith("qw-task-")
+        pod_name, namespace = b._tasks[task_id]
+        assert pod_name.startswith("qw-task-")
+        assert namespace == "test-ns"
 
     async def test_poll_pending(self, backend, mock_setup):
         """poll() returns 'pending' for a pod in Pending phase."""
@@ -270,3 +272,69 @@ class TestK8sBackend:
         health = await b.health_check()
         assert "status" in health
         assert "namespace" in health
+
+    async def test_dispatch_custom_namespace(self, backend, mock_setup):
+        """dispatch() uses namespace from ContainerConfig, not the default namespace."""
+        b, mock_core_v1 = backend
+        mock_core_v1.create_namespaced_pod = MagicMock()
+
+        async def fn():
+            return "ok"
+
+        # Use a custom namespace different from the backend's default "test-ns"
+        cfg = ContainerConfig(
+            backend="k8s", image="worker:latest", namespace="custom-ns"
+        )
+        task = QueueWrapper(coro=fn, container_config=cfg)
+        task_id = await b.dispatch(task)
+
+        # Verify (pod_name, namespace) tuple stored with the correct namespace
+        assert task_id in b._tasks
+        pod_name, stored_ns = b._tasks[task_id]
+        assert stored_ns == "custom-ns"
+
+        # Verify pod was created in the custom namespace
+        call_kwargs = mock_core_v1.create_namespaced_pod.call_args
+        created_ns = call_kwargs[1].get("namespace") or (
+            call_kwargs[0][0] if call_kwargs[0] else None
+        )
+        assert created_ns == "custom-ns"
+
+        # Poll uses the stored namespace
+        mock_pod = MagicMock()
+        mock_pod.status.phase = "Succeeded"
+        mock_core_v1.read_namespaced_pod = MagicMock(return_value=mock_pod)
+        status = await b.poll(task_id)
+        assert status == "completed"
+
+        # Cleanup uses the stored namespace
+        mock_core_v1.delete_namespaced_pod = MagicMock()
+        await b.cleanup(task_id)
+        assert task_id not in b._tasks
+        cleanup_call = mock_core_v1.delete_namespaced_pod.call_args
+        cleanup_ns = cleanup_call[1].get("namespace") or (
+            cleanup_call[0][0] if cleanup_call[0] else None
+        )
+        assert cleanup_ns == "custom-ns"
+
+    async def test_large_task_payload_raises(self, backend, mock_setup):
+        """dispatch() raises ValueError when serialized task exceeds 900KB."""
+        b, mock_core_v1 = backend
+
+        async def fn():
+            return "ok"
+
+        cfg = ContainerConfig(backend="k8s", image="worker:latest")
+        task = QueueWrapper(coro=fn, container_config=cfg)
+
+        # Patch _serialize_task to return a string > 900_000 characters
+        large_payload = "A" * 901_000
+        import qw.backends.k8s as k8s_module
+        original_serialize = b._serialize_task
+        b._serialize_task = lambda t: large_payload
+
+        try:
+            with pytest.raises(ValueError, match="900KB"):
+                await b.dispatch(task)
+        finally:
+            b._serialize_task = original_serialize
