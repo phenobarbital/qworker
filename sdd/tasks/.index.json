@@ -866,7 +866,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [
@@ -876,8 +876,8 @@
       "parallelism_notes": "Modifies qw/client.py \u2014 imports NamedHandlerWrapper from TASK-043. Sequential after TASK-043.",
       "assigned_to": null,
       "started_at": "2026-05-26T00:00:00Z",
-      "completed_at": null,
-      "file": "sdd/tasks/active/TASK-044-qclient-string-dispatch.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-044-qclient-string-dispatch.md"
     },
     {
       "id": "TASK-045",
