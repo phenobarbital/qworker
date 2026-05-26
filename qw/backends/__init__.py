@@ -13,6 +13,7 @@ from .models import (
 from .base import BaseExecutionBackend, BackendRegistry
 from .local import LocalBackend
 from .monitor import ResourceMonitor
+from .dispatch import BackendDispatcher
 
 # DockerBackend is conditionally imported (optional dependency)
 try:
@@ -41,6 +42,7 @@ __all__ = [
     "BackendRegistry",
     "LocalBackend",
     "ResourceMonitor",
+    "BackendDispatcher",
     "DockerBackend",
     "K8sBackend",
 ]

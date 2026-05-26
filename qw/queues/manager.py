@@ -40,6 +40,7 @@ class QueueManager:
         worker_name: str,
         state_tracker=None,
         policy: QueueSizePolicy | None = None,
+        dispatcher=None,
     ) -> None:
         self.logger = logging.getLogger('QW.Queue')
         self.worker_name = worker_name
@@ -62,6 +63,8 @@ class QueueManager:
         )
         # Optional StateTracker for task lifecycle observability
         self._state = state_tracker
+        # Optional BackendDispatcher for container task routing (FEAT-006)
+        self._dispatcher = dispatcher
         # Hysteresis flag — True when we are currently above the warn threshold
         self._warn_active: bool = False
         # Reference to the shrink monitor task (populated by fire_consumers)
@@ -408,8 +411,27 @@ class QueueManager:
                 self._state.task_executing(str(task.id), source="queue")
             ### Process Task:
             try:
-                executor = TaskExecutor(task)
-                result = await executor.run()
+                # FEAT-006: route to container backend if dispatcher is active
+                # and the task requests a container backend or overflow is active
+                if self._dispatcher is not None and (
+                    (
+                        hasattr(task, "container_config")
+                        and task.container_config is not None
+                    )
+                    or self._dispatcher.should_use_container(task)
+                ):
+                    result = await self._dispatcher.dispatch_and_track(task)
+                    # dispatch_and_track returns a TaskResult; extract the result
+                    # value for downstream callback/state handling
+                    if hasattr(result, "success") and not result.success:
+                        result = Exception(
+                            result.error or "Container task failed"
+                        )
+                    else:
+                        result = getattr(result, "result", result)
+                else:
+                    executor = TaskExecutor(task)
+                    result = await executor.run()
                 if isinstance(result, asyncio.TimeoutError):
                     result = asyncio.TimeoutError(
                         "Task %s with id %s was cancelled." % (task, task.id)
