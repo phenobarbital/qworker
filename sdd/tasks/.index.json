@@ -707,7 +707,7 @@
       "feature_id": "FEAT-006",
       "feature": "launch-docker-k8s",
       "spec": "sdd/specs/launch-docker-k8s.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "L",
       "depends_on": [
@@ -717,7 +717,8 @@
       "parallelism_notes": "Creates qw/backends/k8s.py. No file overlap with TASK-034 or TASK-035. Parallel after TASK-033.",
       "assigned_to": null,
       "started_at": "2026-05-25T00:00:00Z",
-      "file": "sdd/tasks/active/TASK-036-k8s-backend.md"
+      "completed_at": "2026-05-26T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-036-k8s-backend.md"
     },
     {
       "id": "TASK-037",
