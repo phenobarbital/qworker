@@ -39,8 +39,10 @@ from .utils.versions import get_versions
 from .state import StateTracker
 from .queues import QueueManager
 from .wrappers import (
-    QueueWrapper
+    QueueWrapper,
+    NamedHandlerWrapper,
 )
+from .registry import handler_registry
 from .executor import TaskExecutor
 from .health import HealthServer
 
@@ -732,6 +734,54 @@ class QWorker:
             )
         await self.closing_writer(writer, result)
 
+    async def handle_named_handler(
+        self,
+        task: "NamedHandlerWrapper",
+        uid: uuid.UUID,
+        writer: asyncio.StreamWriter,
+    ):
+        """Execute a NamedHandlerWrapper by resolving its handler name via the registry.
+
+        Resolution order: explicit register() → entry_points → QWException.
+        Supports async handlers (awaited directly).
+        Sync handlers are not supported per spec — callers should use async handlers.
+
+        Args:
+            task: The NamedHandlerWrapper carrying handler name + args/kwargs.
+            uid: Task UUID for state tracking.
+            writer: asyncio StreamWriter to send result to client.
+        """
+        task_id = str(uid)
+        if self._state is not None:
+            self._state.task_executing(task_id, source="tcp")
+        try:
+            handler = handler_registry.resolve(task.handler_name)
+            if asyncio.iscoroutinefunction(handler):
+                result = await handler(*task.args, **task.kwargs)
+            else:
+                # Run sync handler in a thread executor to avoid blocking the event loop
+                loop = asyncio.get_running_loop()
+                from concurrent.futures import ThreadPoolExecutor
+                from functools import partial as _partial
+                fn = _partial(handler, *task.args, **task.kwargs)
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    result = await loop.run_in_executor(executor, fn)
+            if self._state is not None:
+                self._state.task_completed(task_id, result="success", source="tcp")
+            return await self.return_result(writer, result, task, uid)
+        except Exception as err:  # pylint: disable=W0703
+            if self._state is not None:
+                self._state.task_completed(task_id, result="error", source="tcp")
+            try:
+                result = cloudpickle.dumps(err)
+            except Exception as ex:  # pylint: disable=W0703
+                result = cloudpickle.dumps(
+                    QWException(
+                        f'Error on handler {task.handler_name!r}: {ex!s}'
+                    )
+                )
+            await self.closing_writer(writer, result)
+
     async def handle_queue_wrapper(
         self,
         task: QueueWrapper,
@@ -850,7 +900,11 @@ class QWorker:
                     task_uuid = uuid.uuid1(
                         node=random.getrandbits(48) | 0x010000000000
                     )
-                if isinstance(task, QueueWrapper):
+                # IMPORTANT: NamedHandlerWrapper check MUST come before QueueWrapper
+                # check because NamedHandlerWrapper extends QueueWrapper.
+                if isinstance(task, NamedHandlerWrapper):
+                    return await self.handle_named_handler(task, task_uuid, writer)
+                elif isinstance(task, QueueWrapper):
                     return await self.handle_queue_wrapper(task, task_uuid, writer)
                 elif callable(task):
                     executor = TaskExecutor(task)
