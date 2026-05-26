@@ -830,14 +830,14 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [],
       "parallel": true,
       "parallelism_notes": "Leaf task \u2014 creates qw/registry.py with no file overlap with TASK-043. Can run in parallel with TASK-043.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-26T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-042-handler-registry.md"
     },
@@ -848,14 +848,14 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [],
       "parallel": true,
       "parallelism_notes": "Leaf task \u2014 creates qw/wrappers/named.py with no file overlap with TASK-042. Can run in parallel with TASK-042.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-26T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-043-named-handler-wrapper.md"
     },
@@ -866,7 +866,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "S",
       "depends_on": [
@@ -875,7 +875,7 @@
       "parallel": false,
       "parallelism_notes": "Modifies qw/client.py \u2014 imports NamedHandlerWrapper from TASK-043. Sequential after TASK-043.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-26T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-044-qclient-string-dispatch.md"
     },
@@ -886,7 +886,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -896,7 +896,7 @@
       "parallel": false,
       "parallelism_notes": "Modifies qw/server.py \u2014 imports from both TASK-042 (registry) and TASK-043 (wrapper). Sequential.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-26T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-045-server-handler-resolution.md"
     },
@@ -907,7 +907,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -916,7 +916,7 @@
       "parallel": false,
       "parallelism_notes": "Creates qw/handlers/querysource.py \u2014 depends on TASK-042 (HandlerRegistry for entry_points discovery). Sequential.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-26T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-046-querysource-handler.md"
     },
@@ -927,7 +927,7 @@
       "feature_id": "FEAT-007",
       "feature": "qworker-query-handler",
       "spec": "sdd/specs/qworker-query-handler.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "medium",
       "effort": "M",
       "depends_on": [
@@ -940,7 +940,7 @@
       "parallel": false,
       "parallelism_notes": "Final wiring task \u2014 modifies pyproject.toml and conf.py, writes integration tests. Depends on all prior FEAT-007 tasks.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-05-26T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-047-package-config-integration.md"
     }
