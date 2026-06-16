@@ -47,6 +47,11 @@ WORKER_HEALTH_PORT = config.getint('WORKER_HEALTH_PORT', fallback=8080)
 WORKER_HEARTBEAT_INTERVAL = config.getint('WORKER_HEARTBEAT_INTERVAL', fallback=5)
 WORKER_HEARTBEAT_TIMEOUT = config.getint('WORKER_HEARTBEAT_TIMEOUT', fallback=30)
 WORKER_DRAIN_TIMEOUT = config.getint('WORKER_DRAIN_TIMEOUT', fallback=300)
+# How often (seconds) a worker re-checks its draining status to add/remove
+# its listening socket from the SO_REUSEPORT pool (FEAT: drain-aware listener).
+WORKER_DRAIN_LISTENER_INTERVAL = config.getint(
+    'WORKER_DRAIN_LISTENER_INTERVAL', fallback=2
+)
 SUPERVISOR_CHECK_INTERVAL = config.getint('SUPERVISOR_CHECK_INTERVAL', fallback=10)
 SUPERVISOR_KILL_GRACE = config.getint('SUPERVISOR_KILL_GRACE', fallback=10)
 
