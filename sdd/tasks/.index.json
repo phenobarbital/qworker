@@ -951,14 +951,14 @@
       "feature_id": "FEAT-008",
       "feature": "notifyworker-template-string",
       "spec": "sdd/specs/notifyworker-template-string.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "S",
       "depends_on": [],
       "parallel": false,
       "parallelism_notes": "First task in chain — TASK-049 and TASK-050 depend on this. Modifies qw/conf.py.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-08-06T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-048-conf-template-dir.md"
     },
@@ -969,7 +969,7 @@
       "feature_id": "FEAT-008",
       "feature": "notifyworker-template-string",
       "spec": "sdd/specs/notifyworker-template-string.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "S",
       "depends_on": [
@@ -978,7 +978,7 @@
       "parallel": false,
       "parallelism_notes": "Depends on TASK-048 for TEMPLATE_DIR import. Modifies qw/__main__.py.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-08-06T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-049-cli-template-dir-arg.md"
     },
@@ -989,7 +989,7 @@
       "feature_id": "FEAT-008",
       "feature": "notifyworker-template-string",
       "spec": "sdd/specs/notifyworker-template-string.spec.md",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "effort": "M",
       "depends_on": [
@@ -999,7 +999,7 @@
       "parallel": false,
       "parallelism_notes": "Core integration task — imports TEMPLATE_DIR from TASK-048, reads args.template_dir from TASK-049. Modifies qw/process.py.",
       "assigned_to": null,
-      "started_at": null,
+      "started_at": "2026-08-06T00:00:00Z",
       "completed_at": null,
       "file": "sdd/tasks/active/TASK-050-spawnprocess-template-dir.md"
     }
