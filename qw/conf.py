@@ -15,6 +15,8 @@ MAX_WORKERS = config.getint('MAX_WORKERS', fallback=10)
 WORKER_DEFAULT_HOST = config.get('WORKER_DEFAULT_HOST', fallback='0.0.0.0')
 WORKER_DEFAULT_PORT = config.getint('WORKER_DEFAULT_PORT', fallback=8888)
 NOTIFY_DEFAULT_PORT = config.getint('NOTIFY_DEFAULT_PORT', fallback=8989)
+# Template directory for NotifyWorker (overridden by --template-dir CLI arg)
+TEMPLATE_DIR: str | None = config.get('TEMPLATE_DIR', fallback=None)
 WORKER_DEFAULT_QTY = config.getint('WORKER_DEFAULT_QTY', fallback=4)
 WORKER_QUEUE_SIZE = config.getint('WORKER_QUEUE_SIZE', fallback=4)
 
