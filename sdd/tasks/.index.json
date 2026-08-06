@@ -969,7 +969,7 @@
       "feature_id": "FEAT-008",
       "feature": "notifyworker-template-string",
       "spec": "sdd/specs/notifyworker-template-string.spec.md",
-      "status": "in-progress",
+      "status": "done",
       "priority": "high",
       "effort": "S",
       "depends_on": [
@@ -979,8 +979,8 @@
       "parallelism_notes": "Depends on TASK-048 for TEMPLATE_DIR import. Modifies qw/__main__.py.",
       "assigned_to": null,
       "started_at": "2026-08-06T00:00:00Z",
-      "completed_at": null,
-      "file": "sdd/tasks/active/TASK-049-cli-template-dir-arg.md"
+      "completed_at": "2026-08-06T00:00:00Z",
+      "file": "sdd/tasks/completed/TASK-049-cli-template-dir-arg.md"
     },
     {
       "id": "TASK-050",

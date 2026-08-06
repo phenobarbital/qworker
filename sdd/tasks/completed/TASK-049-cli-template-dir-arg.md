@@ -182,10 +182,13 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-08-06
+**Notes**: Added `--template-dir` argument (dest=`template_dir`, type=str,
+default=None) to `_add_start_args()` in `qw/__main__.py`, placed after
+`--notify_empty` and before `--debug` as specified. Added
+`tests/test_cli_template_dir.py` covering provided value, default None,
+and dest name. Verified `python -m qw start --help` shows the flag. All 3
+tests pass.
 
 **Deviations from spec**: none
