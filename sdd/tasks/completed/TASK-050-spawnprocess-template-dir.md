@@ -435,10 +435,39 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-08-06
+**Notes**: Added `import inspect` and `TEMPLATE_DIR` to the `.conf` import
+block in `qw/process.py`. `SpawnProcess.__init__` now resolves
+`self._template_dir` from `args.template_dir` falling back to
+`TEMPLATE_DIR`. The notify-process `mp.Process(args=...)` tuple now passes
+`self._template_dir` as the 6th positional arg. `start_notify_worker` gained
+`template_dir: str | None = None`, builds an `nw_kwargs` dict, and uses
+`inspect.signature(NotifyWorker.__init__)` to add `template_dir` only when
+supported (forward-compat guard) — the currently installed `NotifyWorker`
+does not accept it, so it is correctly omitted with no crash.
 
-**Completed by**:
-**Date**:
-**Notes**:
+Added `tests/test_spawn_template_dir.py` covering: CLI-arg resolution,
+conf-fallback resolution, both-unset (None), introspection-guard passing
+`template_dir` when supported, omitting it when unsupported, and a direct
+`inspect.signature` sanity check. Patched `qw.process.mp.Process` and
+`qw.process.ProcessSupervisor` in the `SpawnProcess.__init__` tests (in
+addition to the mocks listed in the spec's test fixture) to prevent the
+real supervisor background thread from outliving the `unittest.mock.patch`
+context and attempting a real respawn against a live Redis/network — this
+was causing the test run to hang; the added patches keep the test scope
+exactly on `SpawnProcess.__init__`'s `template_dir` resolution logic with
+no behavioral changes to production code.
 
-**Deviations from spec**: none
+All 6 new tests pass. Full suite (`pytest tests/ -q`) passes: 384 passed,
+no regressions, no orphan processes left behind.
+
+**Deviations from spec**: The test file adds `@patch('qw.process.mp.Process')`
+and `@patch('qw.process.ProcessSupervisor')` to the three
+`TestSpawnProcessTemplateDir` tests, beyond the mocks given in the spec's
+Test Specification (§ Test Specification only mocks `is_port_available`,
+`mp.Manager`, `start_server`). This is a test-isolation fix, not a
+production-code deviation: without it, `ProcessSupervisor`'s real
+background thread survives past the mock context and attempts to respawn
+workers using the real `start_server`, hanging on network I/O. No
+production code (`qw/process.py`) differs from the spec.
