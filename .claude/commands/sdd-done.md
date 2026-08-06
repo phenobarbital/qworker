@@ -202,7 +202,7 @@ If `--resolve-jira` is passed AND the spec has a Jira key (set by `/sdd-tojira`)
 
 **a) Extract the Jira key from the spec:**
 ```bash
-# Look for "**Jira**: [NAV-8036](...)" or a "jira:" metadata field in the spec
+# Look for "**Jira**: [PROJ-1234](...)" or a "jira:" metadata field in the spec
 JIRA_KEY=$(grep -oP '(?<=\*\*Jira\*\*: \[)[A-Z]+-\d+' sdd/specs/<feature>.spec.md)
 # Or from the brainstorm "## Jira Source" table
 if [[ -z "$JIRA_KEY" ]]; then
@@ -218,7 +218,7 @@ If no Jira key is found, skip this step with a note:
 
 **b) Load Jira credentials:**
 ```bash
-eval "$(python -c "from navconfig import config; import os; [print(f'export {k}={v}') for k,v in os.environ.items() if k.startswith('JIRA_')]")"
+# Ensure Jira env vars are set (from .env or environment)
 JIRA_INSTANCE="${JIRA_INSTANCE%/}"
 ```
 
@@ -335,7 +335,7 @@ Local branch deleted: feat-<ID>-<slug>
 
 If `--resolve-jira` was used and succeeded:
 ```
-Jira: NAV-8036 → Done ✅
+Jira: PROJ-1234 → Done ✅
   Subtasks transitioned: 4/4
 ```
 
@@ -345,7 +345,7 @@ If ALL tasks were closed:
 
 Worktree cleaned up.
 Feature branch merged and deleted.
-{if --resolve-jira} Jira NAV-8036 → Done ✅ {end if}
+{if --resolve-jira} Jira PROJ-1234 → Done ✅ {end if}
 ```
 
 ## Reference

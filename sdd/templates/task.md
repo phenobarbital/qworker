@@ -34,9 +34,9 @@
 
 | File | Action | Description |
 |---|---|---|
-| `parrot/path/to/new_file.py` | CREATE | Main implementation |
+| `qw/path/to/new_file.py` | CREATE | Main implementation |
 | `tests/unit/test_new_file.py` | CREATE | Unit tests |
-| `parrot/path/to/existing.py` | MODIFY | Add import / register component |
+| `qw/path/to/existing.py` | MODIFY | Add import / register component |
 
 ---
 
@@ -47,7 +47,7 @@
 ### Pattern to Follow
 ```python
 # Reference implementation pattern from existing code
-# e.g. copy this structure from parrot/loaders/base.py
+# e.g. copy this structure from an existing module in the project
 class ExistingPattern(AbstractBase):
     async def method(self) -> Result:
         ...
@@ -60,8 +60,8 @@ class ExistingPattern(AbstractBase):
 - Add `self.logger` calls at key points
 
 ### References in Codebase
-- `parrot/path/reference1.py` — pattern to follow
-- `parrot/path/reference2.py` — integration point
+- `qw/path/reference1.py` — pattern to follow
+- `qw/path/reference2.py` — integration point
 
 ---
 
@@ -69,8 +69,8 @@ class ExistingPattern(AbstractBase):
 
 - [ ] Implementation complete per scope
 - [ ] All tests pass: `pytest <test_path> -v`
-- [ ] No linting errors: `ruff check parrot/<path>`
-- [ ] Imports work: `from parrot.<module> import <Component>`
+- [ ] No linting errors: `ruff check qw/<path>`
+- [ ] Imports work: `from qw.<module> import <Component>`
 - [ ] Criterion N
 
 ---
@@ -83,7 +83,7 @@ class ExistingPattern(AbstractBase):
 ```python
 # tests/unit/test_<module>.py
 import pytest
-from parrot.<module> import <Component>
+from qw.<module> import <Component>
 
 
 @pytest.fixture

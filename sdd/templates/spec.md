@@ -37,12 +37,12 @@ ComponentA ──→ ComponentB ──→ ComponentC
 ```
 
 ### Integration Points
-<!-- How does this feature integrate with existing AI-Parrot components? -->
+<!-- How does this feature integrate with existing project components? -->
 
 | Existing Component | Integration Type | Notes |
 |---|---|---|
-| `AbstractClient` | extends | ... |
-| `AgentCrew` | uses | ... |
+| `ExistingClass` | extends | ... |
+| `AnotherComponent` | uses | ... |
 
 ### Data Models
 ```python
@@ -67,12 +67,12 @@ class NewComponent:
 > These directly map to Task Artifacts in Phase 2.
 
 ### Module 1: <Name>
-- **Path**: `parrot/path/to/module.py`
+- **Path**: `qw/path/to/module.py`
 - **Responsibility**: What this module does
 - **Depends on**: existing module or Module N from this spec
 
 ### Module 2: <Name>
-- **Path**: `parrot/path/to/module2.py`
+- **Path**: `qw/path/to/module2.py`
 - **Responsibility**: ...
 - **Depends on**: Module 1
 
@@ -117,7 +117,7 @@ def sample_config():
 ## 6. Implementation Notes & Constraints
 
 ### Patterns to Follow
-- Use `AbstractBase` pattern from `parrot/base/`
+- Use `AbstractBase` pattern from the project's base modules
 - Follow async-first design throughout
 - Pydantic models for all structured data
 - Comprehensive logging with `self.logger`
