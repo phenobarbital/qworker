@@ -63,6 +63,42 @@ class TestSpawnProcessTemplateDir:
         sp = SpawnProcess(args)
         assert sp._template_dir is None
 
+    @patch('qw.process.is_port_available', return_value=True)
+    @patch('qw.process.mp.Manager')
+    @patch('qw.process.mp.Process')
+    @patch('qw.process.ProcessSupervisor')
+    @patch('qw.process.start_server')
+    def test_notify_process_spawn_args_include_template_dir(
+        self, _srv, _sup, _proc, _mgr, _port
+    ):
+        """The notify-process mp.Process(args=...) tuple carries the
+        resolved template_dir as its 6th (last) positional argument, in
+        the exact order start_notify_worker expects it."""
+        from qw.process import SpawnProcess
+        _mgr.return_value.dict.return_value = {}
+        args = self._make_args(template_dir='/opt/templates')
+        args.enable_notify = True
+        sp = SpawnProcess(args)
+
+        notify_calls = [
+            call for call in _proc.call_args_list
+            if call.kwargs.get('target') == sp.start_notify_worker
+        ]
+        assert len(notify_calls) == 1, (
+            "Expected exactly one mp.Process call targeting "
+            "start_notify_worker"
+        )
+        spawn_args = notify_calls[0].kwargs['args']
+        assert spawn_args == (
+            args.notify_host,
+            args.notify_port,
+            args.debug,
+            f'NotifyWorker_{sp.id}',
+            args.notify_empty,
+            sp._template_dir,
+        )
+        assert spawn_args[-1] == '/opt/templates'
+
 
 class TestStartNotifyWorkerIntrospection:
     """Tests for the introspection guard on NotifyWorker."""
@@ -71,30 +107,28 @@ class TestStartNotifyWorkerIntrospection:
         """template_dir is forwarded when NotifyWorker accepts it."""
         from qw.process import SpawnProcess
 
+        captured: dict = {}
+
         class FakeNotifyWorker:
             def __init__(self, *, host, port, debug, name,
                          notify_empty_stream, template_dir=None):
-                self.template_dir = template_dir
+                captured['template_dir'] = template_dir
 
             async def start(self):
                 pass
 
         with patch('qw.process.NotifyWorker', FakeNotifyWorker):
             sp = object.__new__(SpawnProcess)
-            loop = None
-            try:
-                sp.start_notify_worker(
-                    host='0.0.0.0',
-                    port=8991,
-                    debug=False,
-                    name='test',
-                    notify_empty=False,
-                    template_dir='/opt/tpl',
-                )
-            except Exception:
-                # start_notify_worker calls loop.run_until_complete(start())
-                # which will complete fine for FakeNotifyWorker.start().
-                raise
+            sp.start_notify_worker(
+                host='0.0.0.0',
+                port=8991,
+                debug=False,
+                name='test',
+                notify_empty=False,
+                template_dir='/opt/tpl',
+            )
+
+        assert captured['template_dir'] == '/opt/tpl'
 
     def test_template_dir_omitted_when_unsupported(self):
         """template_dir is NOT passed when NotifyWorker doesn't accept it."""

@@ -170,7 +170,20 @@ class SpawnProcess:
         notify_empty: bool,
         template_dir: str | None = None,
     ):
-        """Function to start NotifyWorker in a separate process."""
+        """Function to start NotifyWorker in a separate process.
+
+        Args:
+            host: Host/interface the NotifyWorker TCP server binds to.
+            port: Port the NotifyWorker TCP server listens on.
+            debug: Whether to start NotifyWorker in debug mode.
+            name: Process name for logging/identification.
+            notify_empty: Notify when the Redis Stream is empty.
+            template_dir: Directory for notification templates. Forwarded to
+                `NotifyWorker.__init__()` only when the installed
+                `async-notify` version accepts a `template_dir` keyword
+                argument (forward-compat introspection guard); omitted
+                otherwise so older `async-notify` releases keep working.
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         # Build NotifyWorker kwargs
@@ -182,11 +195,20 @@ class SpawnProcess:
             notify_empty_stream=notify_empty,
         )
         # Forward-compat: pass template_dir only if the installed
-        # async-notify version accepts it.
+        # async-notify version accepts it. Note: this only detects an
+        # explicitly named `template_dir` parameter — if a future
+        # NotifyWorker.__init__ instead accepts **kwargs, this guard will
+        # (incorrectly) conclude template_dir is unsupported and omit it.
         if template_dir is not None:
-            sig = inspect.signature(NotifyWorker.__init__)
-            if 'template_dir' in sig.parameters:
-                nw_kwargs['template_dir'] = template_dir
+            try:
+                sig = inspect.signature(NotifyWorker.__init__)
+                if 'template_dir' in sig.parameters:
+                    nw_kwargs['template_dir'] = template_dir
+            except (ValueError, TypeError):
+                # Signature could not be introspected (e.g. a Cython
+                # extension type without embedded signatures) — fall back
+                # to omitting template_dir rather than crashing.
+                pass
         notify_worker = NotifyWorker(**nw_kwargs)
         try:
             loop.run_until_complete(notify_worker.start())
