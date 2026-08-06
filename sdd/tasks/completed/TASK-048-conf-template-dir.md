@@ -170,10 +170,11 @@ When you pick up this task:
 
 ## Completion Note
 
-*(Agent fills this in when done)*
-
-**Completed by**:
-**Date**:
-**Notes**:
+**Completed by**: sdd-worker (Claude)
+**Date**: 2026-08-06
+**Notes**: Added `TEMPLATE_DIR: str | None = config.get('TEMPLATE_DIR', fallback=None)`
+to `qw/conf.py` next to `NOTIFY_DEFAULT_PORT`, matching the existing config
+pattern. Added `tests/test_conf_template_dir.py` covering default-None,
+env-override, and importability. All 3 tests pass.
 
 **Deviations from spec**: none
