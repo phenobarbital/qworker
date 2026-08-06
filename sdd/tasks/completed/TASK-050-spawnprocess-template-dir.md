@@ -462,12 +462,43 @@ no behavioral changes to production code.
 All 6 new tests pass. Full suite (`pytest tests/ -q`) passes: 384 passed,
 no regressions, no orphan processes left behind.
 
+**Post-review fix (2026-08-06)**: A code review (`code-reviewer` agent) of
+the FEAT-008 diff raised four items, all addressed:
+1. 🟠 `test_template_dir_passed_when_supported` had no assertion — it only
+   checked that `start_notify_worker(...)` didn't raise, so it could not
+   distinguish "template_dir forwarded" from "template_dir silently
+   dropped." Fixed: `FakeNotifyWorker.__init__` now captures the received
+   `template_dir` into a dict and the test asserts on it.
+2. 🟠 No test exercised the real `mp.Process(args=...)` wiring with
+   `enable_notify=True` — the positional order in which `self._template_dir`
+   is appended to the spawn-args tuple had zero coverage. Fixed: added
+   `test_notify_process_spawn_args_include_template_dir`, which sets
+   `enable_notify=True`, inspects `mp.Process`'s `call_args_list` for the
+   call targeting `sp.start_notify_worker`, and asserts the full 6-tuple
+   positional order (host, port, debug, name, notify_empty, template_dir).
+3. 🟡 `inspect.signature(NotifyWorker.__init__)` was unguarded — if a future
+   `async-notify` release Cythonizes `NotifyWorker` without embedded
+   signatures, `inspect.signature()` could raise and defeat the guard's
+   own "no crash" purpose. Fixed: wrapped in
+   `try/except (ValueError, TypeError): pass`, falling back to omitting
+   `template_dir`. Also documented the guard's blind spot (a future
+   `**kwargs`-based `__init__` would be misdetected as unsupported).
+4. 🟡 `start_notify_worker`'s docstring didn't document the new
+   `template_dir` parameter — added a Google-style `Args:` block.
+5. 💡 Removed dead `loop = None` and a no-op `try/except Exception: raise`
+   in `test_template_dir_passed_when_supported`.
+
+New test count: 7 in `tests/test_spawn_template_dir.py` (was 6). Full
+suite after fix: 385 passed, no regressions, no orphan processes.
+
 **Deviations from spec**: The test file adds `@patch('qw.process.mp.Process')`
-and `@patch('qw.process.ProcessSupervisor')` to the three
-`TestSpawnProcessTemplateDir` tests, beyond the mocks given in the spec's
-Test Specification (§ Test Specification only mocks `is_port_available`,
-`mp.Manager`, `start_server`). This is a test-isolation fix, not a
-production-code deviation: without it, `ProcessSupervisor`'s real
-background thread survives past the mock context and attempts to respawn
-workers using the real `start_server`, hanging on network I/O. No
-production code (`qw/process.py`) differs from the spec.
+and `@patch('qw.process.ProcessSupervisor')` to the `TestSpawnProcessTemplateDir`
+tests, beyond the mocks given in the spec's Test Specification (§ Test
+Specification only mocks `is_port_available`, `mp.Manager`, `start_server`).
+This is a test-isolation fix, not a production-code deviation: without it,
+`ProcessSupervisor`'s real background thread survives past the mock context
+and attempts to respawn workers using the real `start_server`, hanging on
+network I/O. No production code in `qw/process.py` differs from the spec
+beyond the review-driven defensive `try/except` and docstring additions
+noted above, both of which preserve the exact spec'd behavior (introspect
+→ forward `template_dir` if supported → omit otherwise, never crash).

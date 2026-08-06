@@ -177,4 +177,13 @@ to `qw/conf.py` next to `NOTIFY_DEFAULT_PORT`, matching the existing config
 pattern. Added `tests/test_conf_template_dir.py` covering default-None,
 env-override, and importability. All 3 tests pass.
 
+**Post-review fix (2026-08-06)**: Code review flagged that
+`importlib.reload(qw.conf)` mutates the shared `qw.conf` module object
+in-place, and `monkeypatch`'s env-var revert only happens at fixture
+teardown (i.e. *after* the reload already ran) — a latent test-order leak
+of a stale `TEMPLATE_DIR` value into later tests. Fixed by calling
+`monkeypatch.undo()` explicitly followed by another `importlib.reload()`
+in a `finally` block in both env-mutating tests, restoring `qw.conf` to
+its pre-test state before the next test runs.
+
 **Deviations from spec**: none
