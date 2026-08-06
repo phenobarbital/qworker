@@ -12,6 +12,7 @@ from qw.conf import (
     WORKER_HEALTH_PORT,
 )
 from .process import SpawnProcess
+from .server import _cancel_remaining_tasks
 from .utils import cPrint
 from .utils.events import enable_uvloop
 
@@ -76,6 +77,11 @@ def _add_start_args(parser: argparse.ArgumentParser) -> None:
         help="Notify when Redis Stream is Empty."
     )
     parser.add_argument(
+        '--template-dir', dest='template_dir', type=str,
+        default=None,
+        help='Directory for notification templates (overrides TEMPLATE_DIR env var)'
+    )
+    parser.add_argument(
         '--debug', action="store_true",
         default=False,
         help="Start workers in Debug Mode"
@@ -106,6 +112,7 @@ def run_start(args: argparse.Namespace) -> None:
             process.terminate()
     finally:
         cPrint('Shutdown all workers ...', level='WARN')
+        _cancel_remaining_tasks(loop)
         loop.close()
 
 

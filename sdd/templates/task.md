@@ -34,39 +34,9 @@
 
 | File | Action | Description |
 |---|---|---|
-| `parrot/path/to/new_file.py` | CREATE | Main implementation |
+| `qw/path/to/new_file.py` | CREATE | Main implementation |
 | `tests/unit/test_new_file.py` | CREATE | Unit tests |
-| `parrot/path/to/existing.py` | MODIFY | Add import / register component |
-
----
-
-## Codebase Contract (Anti-Hallucination)
-
-> **CRITICAL**: This section contains VERIFIED code references from the actual codebase.
-> The implementing agent MUST use these exact imports, class names, and method signatures.
-> **DO NOT** invent, guess, or assume any import, attribute, or method not listed here.
-> If you need something not listed, VERIFY it exists first with `grep` or `read`.
-
-### Verified Imports
-<!-- Exact import statements. Use these VERBATIM — do not guess alternatives. -->
-```python
-from parrot.module import ClassName  # verified: parrot/module/__init__.py:NN
-```
-
-### Existing Signatures to Use
-<!-- Classes/methods this task extends, calls, or integrates with.
-     Include the file path and line number for each. -->
-```python
-# parrot/path/to/file.py:NN
-class ExistingClass(BaseClass):
-    attribute: Type  # line NN
-    async def method(self, param: Type) -> ReturnType:  # line NN
-```
-
-### Does NOT Exist
-<!-- Things the agent might assume exist but DO NOT. Prevents hallucination. -->
-- ~~`parrot.module.NonExistentThing`~~ — does not exist
-- ~~`ClassName.phantom_attribute`~~ — not a real attribute
+| `qw/path/to/existing.py` | MODIFY | Add import / register component |
 
 ---
 
@@ -77,7 +47,7 @@ class ExistingClass(BaseClass):
 ### Pattern to Follow
 ```python
 # Reference implementation pattern from existing code
-# e.g. copy this structure from parrot/loaders/base.py
+# e.g. copy this structure from an existing module in the project
 class ExistingPattern(AbstractBase):
     async def method(self) -> Result:
         ...
@@ -90,8 +60,8 @@ class ExistingPattern(AbstractBase):
 - Add `self.logger` calls at key points
 
 ### References in Codebase
-- `parrot/path/reference1.py` — pattern to follow
-- `parrot/path/reference2.py` — integration point
+- `qw/path/reference1.py` — pattern to follow
+- `qw/path/reference2.py` — integration point
 
 ---
 
@@ -99,8 +69,8 @@ class ExistingPattern(AbstractBase):
 
 - [ ] Implementation complete per scope
 - [ ] All tests pass: `pytest <test_path> -v`
-- [ ] No linting errors: `ruff check parrot/<path>`
-- [ ] Imports work: `from parrot.<module> import <Component>`
+- [ ] No linting errors: `ruff check qw/<path>`
+- [ ] Imports work: `from qw.<module> import <Component>`
 - [ ] Criterion N
 
 ---
@@ -113,7 +83,7 @@ class ExistingPattern(AbstractBase):
 ```python
 # tests/unit/test_<module>.py
 import pytest
-from parrot.<module> import <Component>
+from qw.<module> import <Component>
 
 
 @pytest.fixture
@@ -150,17 +120,12 @@ When you pick up this task:
 
 1. **Read the spec** at the path listed above for full context
 2. **Check dependencies** — verify `Depends-on` tasks are in `tasks/completed/`
-3. **Verify the Codebase Contract** — before writing ANY code:
-   - Confirm every import in "Verified Imports" still exists (`grep` or `read` the source)
-   - Confirm every class/method in "Existing Signatures" still has the listed attributes
-   - If anything has changed, update the contract FIRST, then implement
-   - **NEVER** reference an import, attribute, or method not in the contract without verifying it exists
-4. **Update status** in `tasks/.index.json` → `"in-progress"` with your session ID
-5. **Implement** following the scope, codebase contract, and notes above
-6. **Verify** all acceptance criteria are met
-7. **Move this file** to `tasks/completed/TASK-<NNN>-<slug>.md`
-8. **Update index** → `"done"`
-9. **Fill in the Completion Note** below
+3. **Update status** in `tasks/.index.json` → `"in-progress"` with your session ID
+4. **Implement** following the scope and notes above
+5. **Verify** all acceptance criteria are met
+6. **Move this file** to `tasks/completed/TASK-<NNN>-<slug>.md`
+7. **Update index** → `"done"`
+8. **Fill in the Completion Note** below
 
 ---
 

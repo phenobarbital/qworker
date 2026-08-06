@@ -134,3 +134,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+# parrot LLM-wiki state (local retrieval plane)
+.parrot/

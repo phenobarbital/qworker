@@ -15,6 +15,8 @@ MAX_WORKERS = config.getint('MAX_WORKERS', fallback=10)
 WORKER_DEFAULT_HOST = config.get('WORKER_DEFAULT_HOST', fallback='0.0.0.0')
 WORKER_DEFAULT_PORT = config.getint('WORKER_DEFAULT_PORT', fallback=8888)
 NOTIFY_DEFAULT_PORT = config.getint('NOTIFY_DEFAULT_PORT', fallback=8989)
+# Template directory for NotifyWorker (overridden by --template-dir CLI arg)
+TEMPLATE_DIR: str | None = config.get('TEMPLATE_DIR', fallback=None)
 WORKER_DEFAULT_QTY = config.getint('WORKER_DEFAULT_QTY', fallback=4)
 WORKER_QUEUE_SIZE = config.getint('WORKER_QUEUE_SIZE', fallback=4)
 
@@ -47,8 +49,26 @@ WORKER_HEALTH_PORT = config.getint('WORKER_HEALTH_PORT', fallback=8080)
 WORKER_HEARTBEAT_INTERVAL = config.getint('WORKER_HEARTBEAT_INTERVAL', fallback=5)
 WORKER_HEARTBEAT_TIMEOUT = config.getint('WORKER_HEARTBEAT_TIMEOUT', fallback=30)
 WORKER_DRAIN_TIMEOUT = config.getint('WORKER_DRAIN_TIMEOUT', fallback=300)
+# How often (seconds) a worker re-checks its draining status to add/remove
+# its listening socket from the SO_REUSEPORT pool (FEAT: drain-aware listener).
+WORKER_DRAIN_LISTENER_INTERVAL = config.getint(
+    'WORKER_DRAIN_LISTENER_INTERVAL', fallback=2
+)
 SUPERVISOR_CHECK_INTERVAL = config.getint('SUPERVISOR_CHECK_INTERVAL', fallback=10)
 SUPERVISOR_KILL_GRACE = config.getint('SUPERVISOR_KILL_GRACE', fallback=10)
+
+## Container Execution Backends
+DOCKER_HOST = config.get('DOCKER_HOST', fallback=None)
+K8S_NAMESPACE = config.get('K8S_NAMESPACE', fallback='default')
+K8S_KUBECONFIG = config.get('K8S_KUBECONFIG', fallback=None)
+CONTAINER_TASK_MAPPING_FILE = config.get('CONTAINER_TASK_MAPPING_FILE', fallback=None)
+RESOURCE_OVERFLOW_ENABLED = config.getboolean('RESOURCE_OVERFLOW_ENABLED', fallback=False)
+RESOURCE_RECOVER_THRESHOLD = config.getint('RESOURCE_RECOVER_THRESHOLD', fallback=75)
+CONTAINER_POLL_INTERVAL = config.getint('CONTAINER_POLL_INTERVAL', fallback=5)
+# CONTAINER_DEFAULT_TIMEOUT: task execution timeout in seconds
+CONTAINER_DEFAULT_TIMEOUT = config.getint('CONTAINER_DEFAULT_TIMEOUT', fallback=30)
+# CONTAINER_FIRE_FORGET_GRACE: seconds to wait before cleaning up fire-and-forget containers
+CONTAINER_FIRE_FORGET_GRACE = config.getint('CONTAINER_FIRE_FORGET_GRACE', fallback=300)
 
 ## Queue Consumed Callback
 WORKER_QUEUE_CALLBACK = config.get(
@@ -95,6 +115,11 @@ NOFILES = config.getint('ULIMIT_NOFILES', fallback=65535)
 
 PACKAGE_LIST = config.getlist(
     'PACKAGE_LIST', fallback=('asyncdb', 'qw', 'querysource', 'navconfig')
+)
+
+# Handler registry — entry_points group used for named handler discovery
+HANDLER_ENTRY_POINTS_GROUP = config.get(
+    'HANDLER_ENTRY_POINTS_GROUP', fallback='qworker.handlers'
 )
 
 ## Telegram:
