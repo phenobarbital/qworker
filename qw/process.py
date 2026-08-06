@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import uuid
 import multiprocessing as mp
 import resource as res
@@ -16,7 +17,8 @@ from .conf import (
     QW_WORKER_LIST,
     WORKER_DISCOVERY_PORT,
     WORKER_USE_NAKED_IP,
-    QW_MAX_WORKERS
+    QW_MAX_WORKERS,
+    TEMPLATE_DIR,
 )
 
 from .server import start_server, _cancel_remaining_tasks
@@ -89,6 +91,8 @@ class SpawnProcess:
                 "QW Error: Port is already in use"
             )
         self._health_port = getattr(args, 'health_port', 8080)
+        # Resolve template directory: CLI arg takes precedence over conf
+        self._template_dir: str | None = getattr(args, 'template_dir', None) or TEMPLATE_DIR
         # Shared state for observability (multiprocessing.Manager DictProxy)
         self._manager = mp.Manager()
         self._shared_state = self._manager.dict()
@@ -119,6 +123,7 @@ class SpawnProcess:
                         args.debug,
                         _name,
                         args.notify_empty,
+                        self._template_dir,
                     )
                 )
                 JOB_LIST.append(notify_process)
@@ -162,18 +167,27 @@ class SpawnProcess:
         port: str,
         debug: bool,
         name: str,
-        notify_empty: bool
+        notify_empty: bool,
+        template_dir: str | None = None,
     ):
         """Function to start NotifyWorker in a separate process."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        notify_worker = NotifyWorker(
+        # Build NotifyWorker kwargs
+        nw_kwargs: dict = dict(
             host=host,
             port=port,
             debug=debug,
             name=name,
-            notify_empty_stream=notify_empty
+            notify_empty_stream=notify_empty,
         )
+        # Forward-compat: pass template_dir only if the installed
+        # async-notify version accepts it.
+        if template_dir is not None:
+            sig = inspect.signature(NotifyWorker.__init__)
+            if 'template_dir' in sig.parameters:
+                nw_kwargs['template_dir'] = template_dir
+        notify_worker = NotifyWorker(**nw_kwargs)
         try:
             loop.run_until_complete(notify_worker.start())
         except KeyboardInterrupt:
