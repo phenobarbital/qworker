@@ -3,7 +3,7 @@
 **Feature ID**: FEAT-008
 **Date**: 2026-08-06
 **Author**: Jesus Lara
-**Status**: draft
+**Status**: approved
 **Target version**: 1.x.x
 
 ---
@@ -426,8 +426,8 @@ def file_template():
 - [x] Will `NotifyWorker.__init__` accept `template_dir` as a keyword argument?
       — **Assumed yes**, based on user confirmation that the new async-notify will
       support it. Guarded by introspection.
-- [ ] Should `TEMPLATE_DIR` in `qw/conf.py` default to `None` or to a project-level
-      `templates/` directory? — *Owner: Jesus Lara*
+- [x] Should `TEMPLATE_DIR` in `qw/conf.py` default to `None` or to a project-level
+      `templates/` directory? — *Owner: Jesus Lara*: project-level directory
 
 ---
 
