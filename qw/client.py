@@ -36,7 +36,7 @@ from .conf import (
     expected_message
 )
 from .process import QW_WORKER_LIST
-from .wrappers import FuncWrapper, TaskWrapper
+from .wrappers import FuncWrapper, NamedHandlerWrapper, TaskWrapper
 
 
 MAX_RETRY_COUNT = 5
@@ -305,7 +305,14 @@ class QClient:
         queued: bool = False,
         **kwargs
     ):
-        if isinstance(fn, (TaskWrapper, FuncWrapper)):
+        if isinstance(fn, str):
+            # String-based handler dispatch — create a NamedHandlerWrapper that
+            # carries the handler name to the server for registry resolution.
+            # queued and use_wrapper are irrelevant; NamedHandlerWrapper is always immediate.
+            return NamedHandlerWrapper(fn, *args, **kwargs)
+        # Guard against TaskWrapper=None when flowtask is not installed.
+        _wrapper_types = tuple(t for t in (TaskWrapper, FuncWrapper) if t is not None)
+        if _wrapper_types and isinstance(fn, _wrapper_types):
             # already wrapped
             func = fn
             func.queued = queued

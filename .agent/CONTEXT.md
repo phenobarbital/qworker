@@ -128,3 +128,4 @@ Active areas (check these before modifying):
 - `parrot/integrations/mcp/` — MCP server implementation
 - `parrot/tools/` — Tool definitions and toolkits
 - `parrot/integrations/` — Platform integrations (Whatsapp, Telegram, Slack, MS Teams)
+- `flowtask/components/CopyFromBase.py` and `CopyToFileBase.py` — single-step remote↔DataFrame components introduced in FEAT-021 (use these instead of DownloadFrom*+OpenWithPandas / serialize+UploadTo* when ingesting/exporting a single file)

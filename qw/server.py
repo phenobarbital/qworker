@@ -33,14 +33,17 @@ from .conf import (
     WORKER_HEALTH_ENABLED,
     WORKER_HEALTH_PORT,
     WORKER_HEARTBEAT_INTERVAL,
+    WORKER_DRAIN_LISTENER_INTERVAL,
 )
 from datamodel.parsers.json import json_encoder
 from .utils.versions import get_versions
 from .state import StateTracker
 from .queues import QueueManager
 from .wrappers import (
-    QueueWrapper
+    QueueWrapper,
+    NamedHandlerWrapper,
 )
+from .registry import handler_registry
 from .executor import TaskExecutor
 from .health import HealthServer
 
@@ -94,6 +97,12 @@ class QWorker:
         )
         # FEAT-005: background heartbeat task — created in start()
         self._heartbeat_task: Optional[asyncio.Task] = None
+        # FEAT: drain-aware listener — watcher task that adds/removes this
+        # worker's listening socket from the SO_REUSEPORT pool by status.
+        self._drain_watch_task: Optional[asyncio.Task] = None
+        # Cached "host:port" of the listening socket(s); kept valid even
+        # while the listener is closed during draining (used by info/health).
+        self._serving_addrs: str = ""
         # logging:
         self.logger = logging.getLogger(
             f'QW.Server:{self._name}.{self._id}'
@@ -372,15 +381,26 @@ class QWorker:
         except Exception:  # pragma: no cover — defensive
             return False
 
-    async def start(self):
-        # Redis Service:
-        self.start_redis()
-        """Starts Queue Manager."""
-        self.queue = QueueManager(worker_name=self._name, state_tracker=self._state)
-        # Subscription Manager:
-        self.subscription_task = self._loop.create_task(
-            self.start_subscription()
-        )
+    # ------------------------------------------------------------------
+    # FEAT: drain-aware listener — keep draining workers out of the
+    # SO_REUSEPORT pool so the kernel stops routing new connections to them.
+    # ------------------------------------------------------------------
+
+    async def _open_listener(self) -> None:
+        """Create the TCP listener and join the SO_REUSEPORT pool.
+
+        Extracted from ``start()`` so the drain watcher can reopen the
+        listener after a worker recovers from ``draining``. The server
+        begins accepting connections as soon as it is created
+        (``start_serving=True`` by default), so no explicit
+        ``serve_forever()`` call is required.
+
+        Raises:
+            QWException: if the listening socket cannot be created.
+        """
+        if self._server is not None:
+            # Listener already open — nothing to do.
+            return
         try:
             if self._protocol:
                 self._server = await self._loop.create_server(
@@ -402,6 +422,11 @@ class QWorker:
             self.server_address = (
                 socket.gethostbyname(socket.gethostname()), self.port
             )
+            # Cache the serving address so info/health commands keep working
+            # even while the listener is closed during draining.
+            self._serving_addrs = ', '.join(
+                str(sock.getsockname()) for sock in self._server.sockets
+            )
             sock = self._server.sockets[0].getsockname()
             self.logger.info(
                 f'Serving {self._name}:{self._id} on {sock}, pid: {self._pid}'
@@ -410,6 +435,77 @@ class QWorker:
             raise QWException(
                 f"Error: {err}"
             ) from err
+
+    async def _close_listener(self) -> None:
+        """Close the TCP listener so this worker leaves the SO_REUSEPORT pool.
+
+        Only the acceptance of NEW connections stops — connections already
+        being served (tasks in flight) are NOT interrupted. With the
+        listener removed from the pool the kernel routes new client
+        connections to healthy sibling workers instead of this one.
+        """
+        if self._server is None:
+            return
+        server, self._server = self._server, None
+        try:
+            server.close()
+            await server.wait_closed()
+        except Exception as err:  # pragma: no cover — defensive
+            self.logger.error(
+                f"Error closing listener on {self._name}: {err}"
+            )
+
+    async def _drain_listener_watcher(self) -> None:
+        """Toggle the listening socket in/out of the SO_REUSEPORT pool.
+
+        A worker marked ``draining`` by the supervisor must stop accepting
+        NEW TCP connections; otherwise SO_REUSEPORT keeps routing client
+        connections to it and the tasks it then rejects can be lost. When
+        the worker recovers to ``healthy`` the listener is reopened so it
+        rejoins the pool. Runs until ``self._running`` is cleared by
+        ``shutdown()``.
+        """
+        while self._running:
+            try:
+                draining = self._is_draining()
+                if draining and self._server is not None:
+                    self.logger.warning(
+                        "Worker %s is draining — closing listener to leave "
+                        "the SO_REUSEPORT pool",
+                        self._name,
+                    )
+                    await self._close_listener()
+                elif not draining and self._server is None:
+                    self.logger.info(
+                        "Worker %s recovered — reopening listener to rejoin "
+                        "the SO_REUSEPORT pool",
+                        self._name,
+                    )
+                    await self._open_listener()
+            except asyncio.CancelledError:
+                break
+            except Exception:  # pragma: no cover — defensive
+                self.logger.exception(
+                    "drain listener watcher error on %s", self._name
+                )
+            try:
+                await asyncio.sleep(WORKER_DRAIN_LISTENER_INTERVAL)
+            except asyncio.CancelledError:
+                break
+
+    async def start(self):
+        # Redis Service:
+        self.start_redis()
+        """Starts Queue Manager."""
+        self.queue = QueueManager(worker_name=self._name, state_tracker=self._state)
+        # Subscription Manager:
+        self.subscription_task = self._loop.create_task(
+            self.start_subscription()
+        )
+        # FEAT: drain-aware listener — listener creation lives in
+        # _open_listener() so the drain watcher can reopen the socket after
+        # the worker recovers from "draining".
+        await self._open_listener()
         # Start HTTP health server (only on first worker to avoid port conflicts)
         if WORKER_HEALTH_ENABLED and self._id == 0:
             try:
@@ -437,10 +533,19 @@ class QWorker:
             # consumers are running. The loop keeps ticking until
             # self._running is set to False by shutdown().
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-            async with self._server:
-                await self._server.serve_forever()
+            # FEAT: drain-aware listener — the watcher keeps this coroutine
+            # alive (replacing serve_forever) while toggling the listener in
+            # and out of the SO_REUSEPORT pool based on draining status. The
+            # server starts accepting connections as soon as it is created
+            # (start_serving=True), so no explicit serve_forever() is needed.
+            self._drain_watch_task = asyncio.create_task(
+                self._drain_listener_watcher()
+            )
+            await self._drain_watch_task
         except (RuntimeError, KeyboardInterrupt) as err:
             self.logger.exception(err, stack_info=True)
+        except asyncio.CancelledError:
+            pass
 
     async def shutdown(self):
         self._running = False
@@ -459,6 +564,19 @@ class QWorker:
             except Exception as hb_err:  # pragma: no cover — defensive
                 self.logger.error(f"Heartbeat task shutdown error: {hb_err}")
             self._heartbeat_task = None
+        # FEAT: drain-aware listener — cancel the watcher so it stops
+        # toggling the listener and releases the start() coroutine.
+        if self._drain_watch_task is not None:
+            self._drain_watch_task.cancel()
+            try:
+                await self._drain_watch_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as dw_err:  # pragma: no cover — defensive
+                self.logger.error(
+                    f"Drain watcher shutdown error: {dw_err}"
+                )
+            self._drain_watch_task = None
         # Stop health server first
         if self._health_server is not None:
             try:
@@ -476,8 +594,11 @@ class QWorker:
         except KeyboardInterrupt:
             pass
         try:
-            self._server.close()
-            await self._server.wait_closed()
+            # The listener may already be closed if the worker was draining.
+            if self._server is not None:
+                self._server.close()
+                await self._server.wait_closed()
+                self._server = None
         except RuntimeError as err:
             self.logger.exception(
                 err, stack_info=True
@@ -506,7 +627,7 @@ class QWorker:
         writer: asyncio.StreamWriter,
         status: dict = None
     ) -> None:
-        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        addrs = self._serving_addrs
         if not status:
             status = {
                 "pong": "Empty data",
@@ -519,7 +640,7 @@ class QWorker:
         await self.closing_writer(writer, result.encode('utf-8'))
 
     async def worker_health(self, writer: asyncio.StreamWriter):
-        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        addrs = self._serving_addrs
         status = {
             "workers": WORKER_DEFAULT_QTY,
             "queue": {
@@ -538,7 +659,7 @@ class QWorker:
 
     async def worker_check_state(self, writer: asyncio.StreamWriter):
         ## TODO: add last executed task
-        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        addrs = self._serving_addrs
         snap = self.queue.snapshot()
         status = {
             "versions": get_versions(),
@@ -570,7 +691,7 @@ class QWorker:
             workers = self._state.get_all_states()
         else:
             workers = {}
-        addrs = ', '.join(str(sock.getsockname()) for sock in self._server.sockets)
+        addrs = self._serving_addrs
         payload = json_encoder({
             "server": {
                 "address": self.server_address,
@@ -732,6 +853,50 @@ class QWorker:
             )
         await self.closing_writer(writer, result)
 
+    async def handle_named_handler(
+        self,
+        task: "NamedHandlerWrapper",
+        uid: uuid.UUID,
+        writer: asyncio.StreamWriter,
+    ):
+        """Execute a NamedHandlerWrapper by resolving its handler name via the registry.
+
+        Resolution order: explicit register() → entry_points → QWException.
+        Only async coroutine handlers are supported — sync handlers are rejected
+        with a QWException so the client receives a clear error over the wire.
+
+        Args:
+            task: The NamedHandlerWrapper carrying handler name + args/kwargs.
+            uid: Task UUID for state tracking.
+            writer: asyncio StreamWriter to send result to client.
+        """
+        task_id = str(uid)
+        if self._state is not None:
+            self._state.task_executing(task_id, source="tcp")
+        try:
+            handler = handler_registry.resolve(task.handler_name)
+            if not asyncio.iscoroutinefunction(handler):
+                raise QWException(
+                    f"Handler {task.handler_name!r} must be an async coroutine function. "
+                    "Sync handlers are not supported — use 'async def'."
+                )
+            result = await handler(*task.args, **task.kwargs)
+            if self._state is not None:
+                self._state.task_completed(task_id, result="success", source="tcp")
+            return await self.return_result(writer, result, task, uid)
+        except Exception as err:  # pylint: disable=W0703
+            if self._state is not None:
+                self._state.task_completed(task_id, result="error", source="tcp")
+            try:
+                result = cloudpickle.dumps(err)
+            except Exception as ex:  # pylint: disable=W0703
+                result = cloudpickle.dumps(
+                    QWException(
+                        f'Error on handler {task.handler_name!r}: {ex!s}'
+                    )
+                )
+            await self.closing_writer(writer, result)
+
     async def handle_queue_wrapper(
         self,
         task: QueueWrapper,
@@ -850,7 +1015,11 @@ class QWorker:
                     task_uuid = uuid.uuid1(
                         node=random.getrandbits(48) | 0x010000000000
                     )
-                if isinstance(task, QueueWrapper):
+                # IMPORTANT: NamedHandlerWrapper check MUST come before QueueWrapper
+                # check because NamedHandlerWrapper extends QueueWrapper.
+                if isinstance(task, NamedHandlerWrapper):
+                    return await self.handle_named_handler(task, task_uuid, writer)
+                elif isinstance(task, QueueWrapper):
                     return await self.handle_queue_wrapper(task, task_uuid, writer)
                 elif callable(task):
                     executor = TaskExecutor(task)
@@ -911,6 +1080,20 @@ class QWorker:
             )
 
 
+def _cancel_remaining_tasks(loop: asyncio.AbstractEventLoop) -> None:
+    """Cancel all pending tasks and drain callbacks before closing the loop.
+
+    Prevents 'Event loop is closed' errors from uvloop when TCP transports
+    still have pending connect/write callbacks at shutdown time.
+    """
+    pending = asyncio.all_tasks(loop)
+    for task in pending:
+        task.cancel()
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    loop.run_until_complete(loop.shutdown_asyncgens())
+
+
 ### Start Server ###
 def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health_port: int = WORKER_HEALTH_PORT, shared_state=None):
     """thread worker function"""
@@ -953,4 +1136,5 @@ def start_server(num_worker, host, port, debug: bool, notify_empty: bool, health
         pass
     finally:
         if loop:
-            loop.close()  # Close the event loop
+            _cancel_remaining_tasks(loop)
+            loop.close()

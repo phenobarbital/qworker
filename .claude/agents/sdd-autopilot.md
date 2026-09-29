@@ -80,9 +80,9 @@ can execute without asking questions.
 ### Usage
 
 ```
-/sdd-jira NAV-8036
-/sdd-jira NAV-8036 --auto-approve    # skip manual spec approval (risky)
-/sdd-jira NAV-8036 --complexity=fix  # hint: simple fix, minimal Q&A
+/sdd-jira PROJ-1234
+/sdd-jira PROJ-1234 --auto-approve    # skip manual spec approval (risky)
+/sdd-jira PROJ-1234 --complexity=fix  # hint: simple fix, minimal Q&A
 ```
 
 ### Flow
@@ -154,7 +154,7 @@ detailed comments, not just prose descriptions:
 ### 4.1 OAuth Callback Handler
 
 ```python
-# File: parrot/integrations/jira/oauth.py
+# File: src/integrations/auth/oauth.py
 # Extends: aiohttp route handler
 
 async def handle_oauth_callback(request: web.Request) -> web.Response:
@@ -209,9 +209,9 @@ async def handle_oauth_callback(request: web.Request) -> web.Response:
 ## 6. Codebase Contract
 
 ### Does NOT Exist (verified)
-- `parrot.auth.OAuthManager` — does not exist, must be created
+- `project.auth.OAuthManager` — does not exist, must be created
 - `AbstractToolkit.set_credentials()` — no such method
-- `parrot.tools.context.permission_context` — planned but not yet implemented
+- `project.tools.context.permission_context` — planned but not yet implemented
 - `JiraToolkit.oauth_mode` — no such attribute; auth is set at __init__
 ```
 
@@ -249,9 +249,9 @@ git worktree add -b feat-<FEAT-ID>-<slug> \
 #### 7. Output & Handoff
 
 ```
-✅ /sdd-jira complete for NAV-8036
+✅ /sdd-jira complete for PROJ-1234
 
-   Jira: NAV-8036 — "Add OAuth 2.0 support for JiraToolkit"
+   Jira: PROJ-1234 — "Add OAuth 2.0 support for JiraToolkit"
    Spec: sdd/specs/jira-oauth.spec.md (committed to dev)
    Tasks: 4 tasks generated (committed to dev)
    Worktree: .claude/worktrees/feat-071-jira-oauth
@@ -468,7 +468,7 @@ Each stage produces a checkpoint file in `.autopilot/`:
 ```json
 {
   "feature_id": "FEAT-071",
-  "jira_key": "NAV-8036",
+  "jira_key": "PROJ-1234",
   "started_at": "2026-04-14T10:30:00Z",
   "stages": {
     "worker": {
@@ -610,15 +610,15 @@ worker never needs to ask:
 #### Level 1 — Minimum (current sdd-task)
 ```markdown
 ## Scope
-- Create `oauth.py` in `parrot/integrations/jira/`
+- Create `oauth.py` in `src/integrations/auth/`
 - Implement OAuth callback handler
 ```
 
 #### Level 2 — Worker-Ready (required for autopilot)
 ```markdown
 ## Scope
-- **CREATE** `parrot/integrations/jira/oauth.py`
-- **MODIFY** `parrot_tools/jiratoolkit.py` — add `_resolve_credentials()` method
+- **CREATE** `src/integrations/auth/oauth.py`
+- **MODIFY** `src/tools/service_toolkit.py` — add `_resolve_credentials()` method
 
 ## Pseudo-Code
 
@@ -649,11 +649,11 @@ worker never needs to ask:
 
 ## Codebase Contract
 ### Verified Imports
-- `from parrot_tools.toolkit import AbstractToolkit` — packages/ai-parrot-tools/src/parrot_tools/toolkit.py:15
-- `from parrot.tools.manager import ToolManager` — packages/ai-parrot/src/parrot/tools/manager.py:1
+- `from project.toolkit import AbstractToolkit` — src/toolkit.py
+- `from project.tools.manager import ToolManager` — src/tools/manager.py
 
 ### Does NOT Exist
-- `parrot.auth.CredentialResolver` — must be created in this task
+- `project.auth.CredentialResolver` — must be created in this task
 - `AbstractToolkit.credentials` — no such attribute
 - `JiraToolkit.refresh_token()` — no such method
 
@@ -688,7 +688,7 @@ async def test_oauth_callback_invalid_state():
 
 ```bash
 # Human does: review Jira ticket, approve spec
-/sdd-jira NAV-8036
+/sdd-jira PROJ-1234
 
 # Then walk away
 cd .claude/worktrees/feat-071-jira-oauth
@@ -701,7 +701,7 @@ claude --agent sdd-autopilot --verbose
 
 ```bash
 # Planning phase (interactive)
-/sdd-jira NAV-8036
+/sdd-jira PROJ-1234
 
 # Run worker + reviewer only
 cd .claude/worktrees/feat-071-jira-oauth
@@ -710,7 +710,7 @@ claude --agent code-reviewer -p "Review feat-071"
 
 # Human reviews code, then:
 /sdd-done FEAT-071
-/pr-review <PR_URL> NAV-8036
+/pr-review <PR_URL> PROJ-1234
 ```
 
 ### Background Execution (tmux)
@@ -784,9 +784,9 @@ curl -s -X POST "$SLACK_WEBHOOK_URL" \
 
 ---
 
-## Comparison with ai-parrot AgentCrew
+## Comparison with AgentCrew (orchestration framework)
 
-| Aspect | AgentCrew (ai-parrot) | sdd-autopilot (Claude Code) |
+| Aspect | AgentCrew (orchestration framework) | sdd-autopilot (Claude Code) |
 |--------|----------------------|----------------------------|
 | Runtime | Python asyncio | Bash + Claude CLI processes |
 | Agent type | `BasicAgent` / `AbstractBot` | `.claude/agents/*.md` files |

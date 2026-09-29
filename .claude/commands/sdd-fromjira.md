@@ -14,9 +14,9 @@ This command is the Jira-seeded entry point to the SDD pipeline:
 
 ## Usage
 ```
-/sdd-fromjira NAV-8036
-/sdd-fromjira NAV-8036 --complexity=fix       # minimal Q&A, straight to brainstorm
-/sdd-fromjira NAV-8036 --skip-qa              # use Jira description as-is (rare)
+/sdd-fromjira PROJ-1234
+/sdd-fromjira PROJ-1234 --complexity=fix       # minimal Q&A, straight to brainstorm
+/sdd-fromjira PROJ-1234 --skip-qa              # use Jira description as-is (rare)
 ```
 
 ## Guardrails
@@ -41,18 +41,15 @@ Use **mcp-atlassian** if available, falling back to **curl** if not.
 
 ### MCP path (preferred)
 ```
-jira_get_issue(issue_key="NAV-8036")
+jira_get_issue(issue_key="PROJ-1234")
 ```
 
 ### curl fallback
 ```bash
-# Requires env vars loaded via navconfig (env/.env):
-#   JIRA_INSTANCE  — e.g. https://trocglobal.atlassian.net/
+# Requires env vars (from .env or environment):
+#   JIRA_INSTANCE  — e.g. https://yourorg.atlassian.net/
 #   JIRA_USERNAME  — email for Jira Cloud
 #   JIRA_API_TOKEN — API token (Personal Access Token)
-#
-# Load them:
-#   eval "$(python -c "from navconfig import config; import os; [print(f'export {k}={v}') for k,v in os.environ.items() if k.startswith('JIRA_')]")"
 
 JIRA_INSTANCE="${JIRA_INSTANCE%/}"
 curl -s -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
@@ -129,11 +126,11 @@ The `--skip-qa` flag skips Q&A entirely (use only when Jira description is exhau
 Before asking questions, present the extracted context:
 
 ```
-📋 Jira Ticket: NAV-8036
+📋 Jira Ticket: PROJ-1234
 
    Summary: Add OAuth 2.0 support for JiraToolkit
    Type: Story | Priority: High
-   Components: Nav-AI, Backend
+   Components: Core, Backend
    Labels: security, oauth
 
    Description (extracted):
@@ -205,7 +202,7 @@ you reference in the brainstorm, you MUST:
 
 1. **Read the actual source file** and record exact signatures (class name, method names,
    parameter types, return types) with file path and line numbers.
-2. **Verify imports** — confirm `from parrot.X import Y` actually works by checking
+2. **Verify imports** — confirm `from qw.X import Y` actually works by checking
    `__init__.py` files and module structure.
 3. **Capture user-provided code** — if the user pasted code snippets during discovery
    (Steps 4-5), preserve them verbatim in the Code Context section.
@@ -263,11 +260,11 @@ Evaluate the feature's decomposition potential for parallel development:
 3. Add Jira metadata block at the top:
    ```markdown
    ---
-   jira: NAV-8036
+   jira: PROJ-1234
    jira_summary: "Add OAuth 2.0 support for JiraToolkit"
    jira_type: Story
    jira_priority: High
-   jira_components: [Nav-AI, Backend]
+   jira_components: [Core, Backend]
    complexity: standard
    status: exploration
    ---

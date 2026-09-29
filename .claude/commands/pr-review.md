@@ -13,8 +13,8 @@ Optionally converts the PR to draft if criteria are not met.
 ### Examples
 
 ```
-/pr-review https://github.com/Trocdigital/navigator-dataintegrator-tasks/pull/4028 NAV-8036
-/pr-review https://github.com/Trocdigital/navigator-dataintegrator-tasks/pull/4028 NAV-8036 --auto-draft
+/pr-review https://github.com/yourorg/yourrepo/pull/123 PROJ-1234
+/pr-review https://github.com/yourorg/yourrepo/pull/123 PROJ-1234 --auto-draft
 ```
 
 ### Arguments
@@ -22,23 +22,17 @@ Optionally converts the PR to draft if criteria are not met.
 | Argument       | Required | Description |
 |----------------|----------|-------------|
 | `<PR_URL>`     | yes      | Full GitHub PR URL (e.g., `https://github.com/org/repo/pull/123`) |
-| `<JIRA_KEY>`   | yes      | Jira issue key (e.g., `NAV-8036`) |
+| `<JIRA_KEY>`   | yes      | Jira issue key (e.g., `PROJ-1234`) |
 | `--auto-draft` | no       | If present AND criteria fail, convert PR to draft automatically |
 
 ## Prerequisites
 
 - `gh` CLI installed and authenticated (`gh auth status`)
 - `jq` installed (for JSON parsing)
-- Jira credentials configured in `env/.env` (loaded at runtime via `navconfig`):
-  - `JIRA_INSTANCE` — e.g., `https://trocglobal.atlassian.net/`
+- Jira credentials available as environment variables (or in `.env`):
+  - `JIRA_INSTANCE` — e.g., `https://yourorg.atlassian.net/`
   - `JIRA_USERNAME` — email for Jira Cloud
   - `JIRA_API_TOKEN` — API token (Personal Access Token)
-
-To load these variables into the current shell for bash commands, run:
-```bash
-# Quick one-liner to export Jira vars from env/.env
-eval "$(python -c "from navconfig import config; import os; [print(f'export {k}={v}') for k,v in os.environ.items() if k.startswith('JIRA_')]")"
-```
 
 ## Steps
 
@@ -47,7 +41,7 @@ eval "$(python -c "from navconfig import config; import os; [print(f'export {k}=
 Extract org, repo, and PR number from the URL:
 
 ```bash
-# Parse: https://github.com/Trocdigital/navigator-dataintegrator-tasks/pull/4028
+# Parse: https://github.com/yourorg/yourrepo/pull/123
 PR_URL="$1"
 JIRA_KEY="$2"
 AUTO_DRAFT=false
@@ -61,17 +55,12 @@ PR_NUMBER=$(echo "$PR_URL" | sed -E 's|.*/pull/([0-9]+).*|\1|')
 gh auth status 2>/dev/null || echo "⚠️  gh CLI not authenticated. Run: gh auth login"
 ```
 
-Load Jira credentials from `env/.env` via navconfig:
+Load Jira credentials from environment:
 ```bash
-# Load Jira env vars using navconfig (reads env/.env)
-eval "$(python -c "
-from navconfig import config
-import os
-for k in ('JIRA_INSTANCE', 'JIRA_USERNAME', 'JIRA_API_TOKEN'):
-    v = os.environ.get(k, '')
-    if v:
-        print(f'export {k}={v}')
-")"
+# Ensure Jira env vars are set (from .env or environment)
+: "${JIRA_INSTANCE:?JIRA_INSTANCE not set}"
+: "${JIRA_USERNAME:?JIRA_USERNAME not set}"
+: "${JIRA_API_TOKEN:?JIRA_API_TOKEN not set}"
 
 # Strip trailing slash from JIRA_INSTANCE to avoid double-slash in URLs
 JIRA_INSTANCE="${JIRA_INSTANCE%/}"

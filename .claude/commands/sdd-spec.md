@@ -1,6 +1,6 @@
 # /sdd-spec — Scaffold a Feature Specification
 
-Scaffold a new Feature Specification for AI-Parrot using the SDD methodology.
+Scaffold a new Feature Specification using the SDD methodology.
 
 ## Usage
 ```
@@ -42,7 +42,7 @@ This step prevents AI hallucinations during implementation. You MUST:
 2. **For every class/module referenced in the spec**: `read` the actual source file
    and record exact class signatures, method signatures (with parameter types and
    return types), and key attributes — with file paths and line numbers.
-3. **Verify all imports**: confirm that `from parrot.X import Y` resolves by
+3. **Verify all imports**: confirm that `from qw.X import Y` resolves by
    checking `__init__.py` exports and module structure. Do not assume.
 4. **Record what does NOT exist**: if you searched for a plausible module, class,
    or method and it does not exist, add it to the "Does NOT Exist" subsection.
