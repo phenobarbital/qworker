@@ -66,7 +66,10 @@ Funding = "https://paypal.me/phenobarbital"
 version = {attr = "qw.version.__version__"}
 
 [tool.setuptools.packages.find]
-exclude = ["contrib", "docs", "tests", "settings"]
+# Only ship the `qw` package: the repo root also holds app-level folders
+# (resources, plugins, templates, ...) that must not land in site-packages,
+# where they shadow same-named packages of the host project.
+include = ["qw", "qw.*"]
 
 [dependency-groups]
 dev = [
